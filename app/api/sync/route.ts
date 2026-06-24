@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
         action.positionHours
       ) {
         const payload = buildPayload(action.positionHours, today, filename);
-        payload["Project"] = [{ id: action.projectId }];
+        payload["Project"] = [action.projectId];
         await createRecord(HOURS_TABLE, payload);
         created++;
         totalHrs += action.totalHrs ?? 0;
