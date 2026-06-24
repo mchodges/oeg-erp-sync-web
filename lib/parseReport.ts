@@ -31,30 +31,34 @@ export function parseReport(buffer: ArrayBuffer): ParseResult {
   let currentErp: string | null = null;
 
   for (const row of rawRows) {
-    const colB = row[1] != null ? String(row[1]).trim() : "";
+    // Verified column layout from live report:
+    //   C = index 2 → "ERP_CODE | Project Name" on header rows, "... Total:" on total rows
+    //   D = index 3 → employee title on title rows
+    //   I = index 8 → ACTUAL HOURS on title rows
+    const colC = row[2] != null ? String(row[2]).trim() : "";
     const colD = row[3] != null ? String(row[3]).trim() : "";
-    const colH = row[7];
+    const colI = row[8];
 
-    // PROJECT HEADER: non-empty Col B with " | " that doesn't end "Total:"
-    if (colB && colB.includes(" | ") && !colB.endsWith("Total:")) {
-      currentErp = colB.split(" | ")[0].trim();
+    // PROJECT HEADER: Col C contains " | " and does not end with "Total:"
+    if (colC && colC.includes(" | ") && !colC.endsWith("Total:")) {
+      currentErp = colC.split(" | ")[0].trim();
       continue;
     }
 
-    // PROJECT TOTAL ROW: Col B ends with "Total:"
-    if (colB.endsWith("Total:")) {
+    // PROJECT TOTAL ROW: Col C ends with "Total:"
+    if (colC.endsWith("Total:")) {
       currentErp = null;
       continue;
     }
 
-    // TITLE ROW: Col D non-empty, Col H numeric, inside a project block
+    // TITLE ROW: Col D non-empty, Col I numeric, inside a project block
     if (
       colD &&
       colD !== "<Missing Employee Title>" &&
       currentErp !== null &&
-      typeof colH === "number"
+      typeof colI === "number"
     ) {
-      rows.push({ erpCode: currentErp, title: colD, hours: colH });
+      rows.push({ erpCode: currentErp, title: colD, hours: colI });
     }
   }
 
