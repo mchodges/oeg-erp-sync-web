@@ -1,43 +1,31 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import type { PlanResult, ProjectAction, SyncResult } from "@/types";
+import type { BudgetPlanResult, BudgetProjectAction, BudgetSyncResult } from "@/types";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function topPositions(pos: Record<string, number>, n = 3): string {
-  return (
-    Object.entries(pos)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, n)
-      .filter(([, h]) => h > 0)
-      .map(([p, h]) => `${p}: ${h.toFixed(1)}`)
-      .join(", ") || "—"
-  );
-}
-
-function fmt(n: number): string {
+function fmtCurrency(n: number): string {
   return n.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function ActionBadge({ action }: { action: ProjectAction["action"] }) {
-  const map: Record<ProjectAction["action"], { label: string; cls: string }> = {
-    CREATE:       { label: "CREATE",     cls: "bg-green-100 text-green-800" },
-    UPDATE:       { label: "UPDATE",     cls: "bg-blue-100 text-blue-800" },
-    "SKIP-TODAY": { label: "synced",     cls: "bg-gray-100 text-gray-500" },
-    "SKIP-NOERP": { label: "no codes",  cls: "bg-gray-100 text-gray-500" },
-    NOMATCH:      { label: "no match",   cls: "bg-amber-100 text-amber-700" },
+function ActionBadge({ action }: { action: BudgetProjectAction["action"] }) {
+  const map: Record<BudgetProjectAction["action"], { label: string; cls: string }> = {
+    CREATE:       { label: "CREATE",    cls: "bg-green-100 text-green-800" },
+    "SKIP-TODAY": { label: "synced",    cls: "bg-gray-100 text-gray-500" },
+    "SKIP-NOERP": { label: "no codes", cls: "bg-gray-100 text-gray-500" },
+    NOMATCH:      { label: "no match",  cls: "bg-amber-100 text-amber-700" },
   };
   const { label, cls } = map[action];
   return (
-    <span
-      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${cls}`}
-    >
+    <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${cls}`}>
       {label}
     </span>
   );
@@ -45,24 +33,9 @@ function ActionBadge({ action }: { action: ProjectAction["action"] }) {
 
 function Spinner() {
   return (
-    <svg
-      className="animate-spin h-6 w-6 text-indigo-600"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8v8H4z"
-      />
+    <svg className="animate-spin h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
     </svg>
   );
 }
@@ -79,10 +52,10 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
 
 type AppState = "idle" | "planning" | "preview" | "syncing" | "done" | "error";
 
-export default function Home() {
+export default function BudgetPage() {
   const [appState, setAppState] = useState<AppState>("idle");
-  const [plan, setPlan]         = useState<PlanResult | null>(null);
-  const [result, setResult]     = useState<SyncResult | null>(null);
+  const [plan, setPlan]         = useState<BudgetPlanResult | null>(null);
+  const [result, setResult]     = useState<BudgetSyncResult | null>(null);
   const [error, setError]       = useState<string>("");
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -106,10 +79,10 @@ export default function Home() {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res  = await fetch("/api/plan", { method: "POST", body: fd });
+      const res  = await fetch("/api/budget-plan", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `Server error ${res.status}`);
-      setPlan(data as PlanResult);
+      setPlan(data as BudgetPlanResult);
       setAppState("preview");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -139,14 +112,14 @@ export default function Home() {
     if (!plan) return;
     setAppState("syncing");
     try {
-      const res = await fetch("/api/sync", {
+      const res = await fetch("/api/budget-sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: plan.plan, filename: plan.filename }),
+        body: JSON.stringify({ plan: plan.plan }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `Server error ${res.status}`);
-      setResult(data as SyncResult);
+      setResult(data as BudgetSyncResult);
       setAppState("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -154,13 +127,16 @@ export default function Home() {
     }
   }, [plan]);
 
-  // Derived counts (only used in preview state)
-  const writable     = plan?.plan.filter((p) => p.action === "CREATE" || p.action === "UPDATE") ?? [];
-  const nCreate      = writable.filter((p) => p.action === "CREATE").length;
-  const nUpdate      = writable.filter((p) => p.action === "UPDATE").length;
+  // Derived counts
+  const writable     = plan?.plan.filter((p) => p.action === "CREATE") ?? [];
   const nSkipToday   = plan?.plan.filter((p) => p.action === "SKIP-TODAY").length ?? 0;
   const nNoErp       = plan?.plan.filter((p) => p.action === "SKIP-NOERP").length ?? 0;
   const nNoMatch     = plan?.plan.filter((p) => p.action === "NOMATCH").length ?? 0;
+  // Each CREATE action may write 1 or 2 records (Total + Engineering)
+  const nRecords     = writable.reduce(
+    (sum, p) => sum + (p.hasTotalData ? 1 : 0) + (p.hasEngData ? 1 : 0),
+    0,
+  );
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -183,15 +159,15 @@ export default function Home() {
             onDrop={handleDrop}
           >
             <div className="flex flex-col items-center justify-center py-20 px-8 text-center select-none">
-              <div className="text-5xl mb-4">📂</div>
+              <div className="text-5xl mb-4">📊</div>
               <p className="text-gray-700 font-semibold text-lg">
-                Drop your ERP report here
+                Drop your Contract Status report here
               </p>
               <p className="text-gray-500 text-sm mt-1">
                 or click to browse · .xlsx only
               </p>
               <p className="text-gray-400 text-xs mt-4">
-                Reads sheet: "Time and Expenses Summarized"
+                Reads: "Project Contract Status.xlsx" (all PM sheets)
               </p>
             </div>
             <input
@@ -226,11 +202,11 @@ export default function Home() {
                 <strong className="text-gray-900">
                   {plan.parseStats.totalRows.toLocaleString()}
                 </strong>
-                <span className="text-gray-500 ml-1.5">title rows parsed</span>
+                <span className="text-gray-500 ml-1.5">data rows parsed</span>
               </span>
               <span>
                 <strong className="text-gray-900">
-                  {plan.parseStats.uniqueCodes.toLocaleString()}
+                  {plan.parseStats.uniqueKeys.toLocaleString()}
                 </strong>
                 <span className="text-gray-500 ml-1.5">unique ERP codes</span>
               </span>
@@ -242,11 +218,9 @@ export default function Home() {
             {/* Writable actions table */}
             <Card className="overflow-hidden">
               <div className="px-6 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-700">
-                  Records to write
-                </h2>
+                <h2 className="text-sm font-semibold text-gray-700">Records to write</h2>
                 <span className="text-sm text-gray-400">
-                  {nCreate} create · {nUpdate} update
+                  {nRecords} record{nRecords !== 1 ? "s" : ""} across {writable.length} project{writable.length !== 1 ? "s" : ""}
                 </span>
               </div>
 
@@ -261,16 +235,19 @@ export default function Home() {
                       <tr className="border-b border-gray-100 text-left text-xs text-gray-500 uppercase tracking-wide">
                         <th className="px-5 py-3 font-medium">Project #</th>
                         <th className="px-4 py-3 font-medium">Action</th>
-                        <th className="px-4 py-3 font-medium">ERP Codes</th>
-                        <th className="px-4 py-3 font-medium text-right">
-                          Total Hrs
-                        </th>
-                        <th className="px-4 py-3 font-medium">Top 3 Positions</th>
+                        <th className="px-4 py-3 font-medium">Categories</th>
+                        <th className="px-4 py-3 font-medium text-right">Total Budget</th>
+                        <th className="px-4 py-3 font-medium text-right">Total Spent</th>
+                        <th className="px-4 py-3 font-medium text-right">Eng Budget</th>
+                        <th className="px-4 py-3 font-medium text-right">Eng Spent</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {writable.map((item, i) => {
-                        const codes = (item.atCodes ?? []).join(", ");
+                        const cats = [
+                          item.hasTotalData && "Total",
+                          item.hasEngData && "Engineering",
+                        ].filter(Boolean).join(", ");
                         return (
                           <tr key={i} className="hover:bg-gray-50 transition-colors">
                             <td className="px-5 py-3 font-mono text-xs text-gray-900 whitespace-nowrap">
@@ -279,21 +256,20 @@ export default function Home() {
                             <td className="px-4 py-3 whitespace-nowrap">
                               <ActionBadge action={item.action} />
                             </td>
-                            <td className="px-4 py-3 text-xs text-gray-600 max-w-[180px]">
-                              <span
-                                className="block truncate"
-                                title={codes}
-                              >
-                                {codes}
-                              </span>
+                            <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                              {cats}
                             </td>
-                            <td className="px-4 py-3 text-right font-mono text-gray-900 whitespace-nowrap">
-                              {fmt(item.totalHrs ?? 0)}
+                            <td className="px-4 py-3 text-right font-mono text-xs text-gray-900 whitespace-nowrap">
+                              {item.hasTotalData ? fmtCurrency(item.totalBudget) : "—"}
                             </td>
-                            <td className="px-4 py-3 text-xs text-gray-600">
-                              {item.positionHours
-                                ? topPositions(item.positionHours)
-                                : "—"}
+                            <td className="px-4 py-3 text-right font-mono text-xs text-gray-600 whitespace-nowrap">
+                              {item.hasTotalData ? fmtCurrency(item.totalSpent) : "—"}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-xs text-gray-900 whitespace-nowrap">
+                              {item.hasEngData ? fmtCurrency(item.engBudget) : "—"}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-xs text-gray-600 whitespace-nowrap">
+                              {item.hasEngData ? fmtCurrency(item.engSpent) : "—"}
                             </td>
                           </tr>
                         );
@@ -304,7 +280,7 @@ export default function Home() {
               )}
             </Card>
 
-            {/* Other-action summary */}
+            {/* Skip summary */}
             {(nSkipToday + nNoErp + nNoMatch) > 0 && (
               <div className="px-5 py-3 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-500 flex flex-wrap gap-5">
                 {nSkipToday > 0 && (
@@ -328,29 +304,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Unrecognized titles (collapsible) */}
-            {Object.keys(plan.unrecognized).length > 0 && (
-              <details className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm">
-                <summary className="cursor-pointer font-medium text-amber-800">
-                  {Object.keys(plan.unrecognized).length} unrecognized title(s)
-                  — hours not written to Airtable
-                </summary>
-                <ul className="mt-2 space-y-1 text-xs text-amber-700">
-                  {Object.entries(plan.unrecognized)
-                    .sort(([, a], [, b]) => b - a)
-                    .map(([title, hrs]) => (
-                      <li key={title}>
-                        <span className="font-mono">{hrs.toFixed(2)} hrs</span>{" "}
-                        — {title}
-                      </li>
-                    ))}
-                </ul>
-                <p className="mt-2 text-xs text-amber-600">
-                  Add these to TITLE_MAP in lib/erpCodes.ts to track them.
-                </p>
-              </details>
-            )}
-
             {/* CTA buttons */}
             <div className="flex items-center gap-3 pt-1">
               <button
@@ -361,10 +314,7 @@ export default function Home() {
                   focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
                   transition-colors"
               >
-                Confirm Sync —{" "}
-                {nCreate > 0 && `${nCreate} create${nCreate !== 1 ? "s" : ""}`}
-                {nCreate > 0 && nUpdate > 0 && ", "}
-                {nUpdate > 0 && `${nUpdate} update${nUpdate !== 1 ? "s" : ""}`}
+                Confirm Sync — {nRecords} record{nRecords !== 1 ? "s" : ""}
               </button>
               <button
                 onClick={reset}
@@ -387,43 +337,25 @@ export default function Home() {
                 ✓
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Sync complete
-                </h2>
+                <h2 className="text-lg font-semibold text-gray-900">Sync complete</h2>
                 <p className="text-sm text-gray-500">{result.today}</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
               {[
-                { label: "Created",       value: result.created,      color: "green" },
-                { label: "Updated",       value: result.updated,      color: "blue" },
-                { label: "Skipped today", value: result.skippedToday, color: "gray" },
-                { label: "No match",      value: result.noMatch,      color: "gray" },
-                { label: "No ERP codes",  value: result.noErp,        color: "gray" },
+                { label: "Records Created", value: result.created,      color: "green" },
+                { label: "Skipped today",   value: result.skippedToday, color: "gray" },
+                { label: "No match",        value: result.noMatch,      color: "gray" },
+                { label: "No ERP codes",    value: result.noErp,        color: "gray" },
               ].map(({ label, value, color }) => (
                 <div key={label} className="bg-gray-50 rounded-lg px-5 py-4">
-                  <div
-                    className={`text-3xl font-bold ${
-                      color === "green"
-                        ? "text-green-700"
-                        : color === "blue"
-                        ? "text-blue-700"
-                        : "text-gray-700"
-                    }`}
-                  >
+                  <div className={`text-3xl font-bold ${color === "green" ? "text-green-700" : "text-gray-700"}`}>
                     {value}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">{label}</div>
                 </div>
               ))}
-
-              <div className="bg-indigo-50 rounded-lg px-5 py-4">
-                <div className="text-3xl font-bold text-indigo-700">
-                  {fmt(result.totalHrs)}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">total hours written</div>
-              </div>
             </div>
 
             <button
@@ -444,9 +376,7 @@ export default function Home() {
               <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-lg font-bold">
                 !
               </div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Something went wrong
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-900">Something went wrong</h2>
             </div>
             <pre className="text-sm text-red-700 bg-red-50 rounded-lg p-4 mb-6 whitespace-pre-wrap break-all font-mono">
               {error}

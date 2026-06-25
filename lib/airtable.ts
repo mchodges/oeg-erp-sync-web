@@ -3,6 +3,7 @@ const BASE_URL = "https://api.airtable.com/v0";
 export const BASE_ID         = "app5bWT0n7TPWHWWy";
 export const PROJECTS_TABLE  = "tblWeL8UyZm5pRf6h";
 export const HOURS_TABLE     = "tbl1vOP20ZQUg6nG6";
+export const BUDGETS_TABLE   = "tblyOKwke62a2P8CN";
 
 export interface AirtableRecord {
   id: string;

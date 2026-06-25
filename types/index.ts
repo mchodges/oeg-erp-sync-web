@@ -35,3 +35,36 @@ export interface SyncResult {
   totalHrs: number;
   today: string;
 }
+
+// ── Budget Sync Types ──────────────────────────────────────────────────────────
+
+export type BudgetActionType = "CREATE" | "SKIP-TODAY" | "SKIP-NOERP" | "NOMATCH";
+
+export interface BudgetProjectAction {
+  action: BudgetActionType;
+  projNum: string;
+  projectId: string;
+  totalBudget: number;
+  totalSpent: number;
+  engBudget: number;
+  engSpent: number;
+  hasTotalData: boolean;
+  hasEngData: boolean;
+  totalCodes: string[];
+  engCodes: string[];
+}
+
+export interface BudgetPlanResult {
+  plan: BudgetProjectAction[];
+  filename: string;
+  parseStats: { totalRows: number; uniqueKeys: number };
+  today: string;
+}
+
+export interface BudgetSyncResult {
+  created: number;
+  skippedToday: number;
+  noErp: number;
+  noMatch: number;
+  today: string;
+}
