@@ -68,3 +68,93 @@ export interface BudgetSyncResult {
   noMatch: number;
   today: string;
 }
+
+// ── Pricing Estimator Types ─────────────────────────────────────────────────
+
+export interface RawBidRow {
+  contractor: string;
+  originalDescription: string;
+  qty: number;
+  unit: string;
+  price: number;
+}
+
+export interface HarvestFileResult {
+  filename: string;
+  projectName: string | null;
+  bidDate: string | null;
+  totalRows: number;
+  newRows: number;
+  duplicateRows: number;
+  rows: RawBidRow[];
+  error?: string;
+}
+
+export interface HarvestPlanResult {
+  files: HarvestFileResult[];
+  totalNewRows: number;
+}
+
+export interface HarvestSyncResult {
+  inserted: number;
+  duplicatesSkipped: number;
+}
+
+export interface UnmatchedItem {
+  description: string;
+  unit: string;
+}
+
+export interface UnmatchedItemsResult {
+  items: UnmatchedItem[];
+  totalCount: number;
+}
+
+export type MatchConfidence = "High" | "Medium" | "Low";
+export type LivingMatchStatus = "Pending" | "Verified" | "Ignored";
+
+export interface LivingMatchGuess {
+  recordId: string;
+  rawDescription: string;
+  rawUnit: string;
+  aiGuess: string;
+  confidence: MatchConfidence;
+}
+
+export interface LivingMatchRecord extends LivingMatchGuess {
+  /** Master_Catalog record id currently linked via Living_Matches.Master_Item, or "" if unresolved. */
+  masterItemId: string;
+  status: LivingMatchStatus;
+}
+
+export interface MasterCatalogOption {
+  id: string;
+  name: string;
+}
+
+export interface LivingMatchesResult {
+  records: LivingMatchRecord[];
+  masterItems: MasterCatalogOption[];
+}
+
+export interface MasterCatalogStat {
+  recordId: string;
+  masterItem: string;
+  standardUnit: string;
+  count: number;
+  weightedAvg: number | null;
+  median: number | null;
+  low: number | null;
+  high: number | null;
+}
+
+export interface PricingEstimateResult {
+  report: MasterCatalogStat[];
+  reviewCount: number;
+  today: string;
+}
+
+export interface EstimateSyncResult {
+  updated: number;
+  today: string;
+}

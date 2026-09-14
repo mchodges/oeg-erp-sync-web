@@ -50,6 +50,7 @@ async function atFetch(
 export async function fetchAllRecords(
   tableId: string,
   options: { filterByFormula?: string; fields?: string[] } = {},
+  baseId: string = BASE_ID,
 ): Promise<AirtableRecord[]> {
   const records: AirtableRecord[] = [];
   let offset: string | undefined;
@@ -65,7 +66,7 @@ export async function fetchAllRecords(
 
     const data = (await atFetch(
       "GET",
-      `/${BASE_ID}/${tableId}?${params}`,
+      `/${baseId}/${tableId}?${params}`,
     )) as { records: AirtableRecord[]; offset?: string };
 
     records.push(...data.records);
@@ -78,8 +79,9 @@ export async function fetchAllRecords(
 export async function createRecord(
   tableId: string,
   fields: Record<string, unknown>,
+  baseId: string = BASE_ID,
 ): Promise<AirtableRecord> {
-  return (await atFetch("POST", `/${BASE_ID}/${tableId}`, {
+  return (await atFetch("POST", `/${baseId}/${tableId}`, {
     fields,
   })) as AirtableRecord;
 }
@@ -88,12 +90,49 @@ export async function updateRecord(
   tableId: string,
   recordId: string,
   fields: Record<string, unknown>,
+  baseId: string = BASE_ID,
 ): Promise<AirtableRecord> {
   return (await atFetch(
     "PATCH",
-    `/${BASE_ID}/${tableId}/${recordId}`,
+    `/${baseId}/${tableId}/${recordId}`,
     { fields },
   )) as AirtableRecord;
+}
+
+const BATCH_SIZE = 10; // Airtable's max records per create/update call
+
+/** Batch-creates records, 10 at a time (Airtable API limit). */
+export async function createRecords(
+  tableId: string,
+  records: { fields: Record<string, unknown> }[],
+  baseId: string = BASE_ID,
+): Promise<AirtableRecord[]> {
+  const results: AirtableRecord[] = [];
+  for (let i = 0; i < records.length; i += BATCH_SIZE) {
+    const chunk = records.slice(i, i + BATCH_SIZE);
+    const data = (await atFetch("POST", `/${baseId}/${tableId}`, {
+      records: chunk,
+    })) as { records: AirtableRecord[] };
+    results.push(...data.records);
+  }
+  return results;
+}
+
+/** Batch-updates records, 10 at a time (Airtable API limit). */
+export async function updateRecords(
+  tableId: string,
+  records: { id: string; fields: Record<string, unknown> }[],
+  baseId: string = BASE_ID,
+): Promise<AirtableRecord[]> {
+  const results: AirtableRecord[] = [];
+  for (let i = 0; i < records.length; i += BATCH_SIZE) {
+    const chunk = records.slice(i, i + BATCH_SIZE);
+    const data = (await atFetch("PATCH", `/${baseId}/${tableId}`, {
+      records: chunk,
+    })) as { records: AirtableRecord[] };
+    results.push(...data.records);
+  }
+  return results;
 }
 
 /** Normalize a linked-record field value to a flat list of record ID strings. */

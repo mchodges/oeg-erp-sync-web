@@ -26,6 +26,7 @@ export function Nav() {
     <nav className="bg-indigo-800 px-4 flex gap-1">
       {link("/", "Hours Sync")}
       {link("/budget", "Budget Sync")}
+      {link("/pricing", "Bid Pricing")}
     </nav>
   );
 }
