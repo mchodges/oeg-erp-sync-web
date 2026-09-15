@@ -12,7 +12,7 @@ function fmtMoney(n: number | null): string {
 }
 
 function toCsv(report: MasterCatalogStat[]): string {
-  const header = ["Master Item", "Standard Unit", "Count", "Weighted Avg", "Median", "Low", "High"];
+  const header = ["Master Item", "Standard Unit", "Count", "Weighted Avg", "Median", "Low", "High", "Notes"];
   const rows = report.map((r) => [
     r.masterItem,
     r.standardUnit,
@@ -21,6 +21,7 @@ function toCsv(report: MasterCatalogStat[]): string {
     r.median ?? "",
     r.low ?? "",
     r.high ?? "",
+    r.excludeFromStats ? "Allowance/contingency item — excluded from pricing stats" : "",
   ]);
   return [header, ...rows]
     .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
@@ -126,7 +127,7 @@ export function EstimatePanel() {
             <div className="px-6 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-700">Pricing report</h2>
               <span className="text-sm text-gray-400">
-                {estimate.report.filter((r) => r.count > 0).length} of {estimate.report.length} items priced
+                {estimate.report.filter((r) => r.weightedAvg !== null).length} of {estimate.report.length} items priced
               </span>
             </div>
             <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
@@ -145,13 +146,32 @@ export function EstimatePanel() {
                 <tbody className="divide-y divide-gray-50">
                   {estimate.report.map((r) => (
                     <tr key={r.recordId} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-5 py-3 text-gray-900">{r.masterItem}</td>
+                      <td className="px-5 py-3 text-gray-900">
+                        {r.masterItem}
+                        {r.excludeFromStats && (
+                          <span
+                            title="Allowance/contingency item — bid unit prices are nominal placeholders, not real market pricing. Excluded from stats."
+                            className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]
+                              font-semibold bg-amber-50 text-amber-700 border border-amber-200"
+                          >
+                            ⚠ Allowance item
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-xs text-gray-500">{r.standardUnit}</td>
                       <td className="px-4 py-3 text-right font-mono text-xs text-gray-600">{r.count}</td>
-                      <td className="px-4 py-3 text-right font-mono text-xs text-gray-900">{fmtMoney(r.weightedAvg)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-xs text-gray-600">{fmtMoney(r.median)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-xs text-gray-600">{fmtMoney(r.low)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-xs text-gray-600">{fmtMoney(r.high)}</td>
+                      {r.excludeFromStats ? (
+                        <td colSpan={4} className="px-4 py-3 text-center text-xs text-amber-700">
+                          Not priced — excluded from stats
+                        </td>
+                      ) : (
+                        <>
+                          <td className="px-4 py-3 text-right font-mono text-xs text-gray-900">{fmtMoney(r.weightedAvg)}</td>
+                          <td className="px-4 py-3 text-right font-mono text-xs text-gray-600">{fmtMoney(r.median)}</td>
+                          <td className="px-4 py-3 text-right font-mono text-xs text-gray-600">{fmtMoney(r.low)}</td>
+                          <td className="px-4 py-3 text-right font-mono text-xs text-gray-600">{fmtMoney(r.high)}</td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>

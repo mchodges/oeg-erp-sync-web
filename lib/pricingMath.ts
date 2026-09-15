@@ -100,10 +100,11 @@ export function computeEstimateReport(
       masterItem: item.masterItemName,
       standardUnit: item.standardUnit,
       count: stats?.count ?? 0,
-      weightedAvg: stats?.weightedAvg ?? null,
-      median: stats?.median ?? null,
-      low: stats?.low ?? null,
-      high: stats?.high ?? null,
+      weightedAvg: item.excludeFromStats ? null : stats?.weightedAvg ?? null,
+      median: item.excludeFromStats ? null : stats?.median ?? null,
+      low: item.excludeFromStats ? null : stats?.low ?? null,
+      high: item.excludeFromStats ? null : stats?.high ?? null,
+      excludeFromStats: item.excludeFromStats,
     };
   });
 

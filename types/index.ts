@@ -146,6 +146,9 @@ export interface MasterCatalogStat {
   median: number | null;
   low: number | null;
   high: number | null;
+  /** True for allowance/contingency-type items (e.g. Ductile Iron Fittings) where bid
+   * unit prices are nominal placeholders, not real market pricing — stats are withheld. */
+  excludeFromStats: boolean;
 }
 
 export interface PricingEstimateResult {

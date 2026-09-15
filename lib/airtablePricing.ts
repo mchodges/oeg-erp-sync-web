@@ -15,18 +15,20 @@ export interface MasterCatalogRecord {
   id: string;
   masterItemName: string;
   standardUnit: string;
+  excludeFromStats: boolean;
 }
 
 export async function fetchMasterCatalog(): Promise<MasterCatalogRecord[]> {
   const records = await fetchAllRecords(
     MASTER_CATALOG_TABLE(),
-    { fields: ["Master_Item_Name", "Standard_Unit"] },
+    { fields: ["Master_Item_Name", "Standard_Unit", "Exclude_From_Stats"] },
     PRICING_BASE_ID(),
   );
   return records.map((r) => ({
     id: r.id,
     masterItemName: String(r.fields.Master_Item_Name ?? "").trim(),
     standardUnit: String(r.fields.Standard_Unit ?? "").trim(),
+    excludeFromStats: Boolean(r.fields.Exclude_From_Stats),
   }));
 }
 
