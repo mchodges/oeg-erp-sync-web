@@ -9,8 +9,29 @@ export interface BidTabParseResult {
 
 const HEADER_SCAN_WINDOW = 20;
 
+/**
+ * Repairs "UTF-8 decoded as Windows-1252" mojibake for curly quotes (frequently
+ * used for inch/foot marks in bid tabs, e.g. a right-double-quote U+201D typed
+ * via autocorrect) and strips any other unpaired UTF-16 surrogate that slips
+ * through. Without this, a corrupted description byte-mismatches its own record
+ * forever - every later exact-string lookup (dedupe, dictionary map, "already
+ * reviewed" checks) silently fails, so the same line item never resolves and
+ * keeps getting re-sent to the AI matcher on every scan.
+ */
+function fixMojibake(s: string): string {
+  const replacements: [RegExp, string][] = [
+    [/â€˜/g, "'"], // U+2018 left single quote
+    [/â€™/g, "'"], // U+2019 right single quote
+    [/â€œ/g, '"'], // U+201C left double quote
+    [/â€[\udc9d]/g, '"'], // U+201D right double quote (unmapped cp1252 byte -> surrogate)
+  ];
+  let out = s;
+  for (const [pattern, repl] of replacements) out = out.replace(pattern, repl);
+  return out.replace(/[\uD800-\uDFFF]/g, ""); // strip any remaining unpaired surrogate
+}
+
 function cellStr(v: unknown): string {
-  return v == null ? "" : String(v).trim();
+  return v == null ? "" : fixMojibake(String(v).trim());
 }
 
 function findHeaderRowIndex(rawRows: unknown[][]): number | null {
