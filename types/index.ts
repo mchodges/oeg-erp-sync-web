@@ -141,6 +141,7 @@ export interface MasterCatalogStat {
   recordId: string;
   masterItem: string;
   standardUnit: string;
+  category: string;
   count: number;
   weightedAvg: number | null;
   median: number | null;

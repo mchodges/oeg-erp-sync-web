@@ -1,10 +1,42 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { EstimateSyncResult, MasterCatalogStat, PricingEstimateResult } from "@/types";
 import { Card, Spinner, ErrorCard } from "./ui";
 
 type AppState = "idle" | "generating" | "preview" | "writing" | "done" | "error";
+
+type SortKey =
+  | "masterItem"
+  | "category"
+  | "standardUnit"
+  | "count"
+  | "weightedAvg"
+  | "median"
+  | "low"
+  | "high";
+type SortDir = "asc" | "desc";
+
+const DEFAULT_SORT: { key: SortKey; dir: SortDir } = { key: "masterItem", dir: "asc" };
+
+/** Nulls (no data / excluded items) always sort to the bottom, regardless of direction. */
+function compareRows(a: MasterCatalogStat, b: MasterCatalogStat, key: SortKey, dir: SortDir): number {
+  const av = a[key];
+  const bv = b[key];
+  let cmp: number;
+  if (typeof av === "string" || typeof bv === "string") {
+    cmp = String(av ?? "").localeCompare(String(bv ?? ""));
+  } else if (av == null && bv == null) {
+    cmp = 0;
+  } else if (av == null) {
+    return 1;
+  } else if (bv == null) {
+    return -1;
+  } else {
+    cmp = av - bv;
+  }
+  return dir === "asc" ? cmp : -cmp;
+}
 
 function fmtMoney(n: number | null): string {
   if (n == null) return "—";
@@ -12,9 +44,10 @@ function fmtMoney(n: number | null): string {
 }
 
 function toCsv(report: MasterCatalogStat[]): string {
-  const header = ["Master Item", "Standard Unit", "Count", "Weighted Avg", "Median", "Low", "High", "Notes"];
+  const header = ["Master Item", "Category", "Standard Unit", "Count", "Weighted Avg", "Median", "Low", "High", "Notes"];
   const rows = report.map((r) => [
     r.masterItem,
+    r.category,
     r.standardUnit,
     String(r.count),
     r.weightedAvg ?? "",
@@ -38,18 +71,61 @@ function downloadCsv(report: MasterCatalogStat[]) {
   URL.revokeObjectURL(url);
 }
 
+function SortHeader({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  align,
+  className,
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: { key: SortKey; dir: SortDir };
+  onSort: (key: SortKey) => void;
+  align?: "right";
+  className?: string;
+}) {
+  const active = sort.key === sortKey;
+  return (
+    <th
+      onClick={() => onSort(sortKey)}
+      className={`${className ?? "px-4 py-3"} font-medium cursor-pointer select-none
+        hover:text-gray-700 ${align === "right" ? "text-right" : "text-left"}`}
+    >
+      {label}
+      <span className={`ml-1 inline-block w-3 ${active ? "text-gray-600" : "text-gray-300"}`}>
+        {active ? (sort.dir === "asc" ? "▲" : "▼") : "▲"}
+      </span>
+    </th>
+  );
+}
+
 export function EstimatePanel() {
   const [appState, setAppState] = useState<AppState>("idle");
   const [estimate, setEstimate] = useState<PricingEstimateResult | null>(null);
   const [syncResult, setSyncResult] = useState<EstimateSyncResult | null>(null);
   const [error, setError] = useState("");
+  const [sort, setSort] = useState(DEFAULT_SORT);
 
   const reset = useCallback(() => {
     setAppState("idle");
     setEstimate(null);
     setSyncResult(null);
     setError("");
+    setSort(DEFAULT_SORT);
   }, []);
+
+  const toggleSort = useCallback((key: SortKey) => {
+    setSort((prev) =>
+      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" },
+    );
+  }, []);
+
+  const sortedReport = useMemo(() => {
+    if (!estimate) return [];
+    return [...estimate.report].sort((a, b) => compareRows(a, b, sort.key, sort.dir));
+  }, [estimate, sort]);
 
   const generate = useCallback(async () => {
     setAppState("generating");
@@ -134,17 +210,18 @@ export function EstimatePanel() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-white">
                   <tr className="border-b border-gray-100 text-left text-xs text-gray-500 uppercase tracking-wide">
-                    <th className="px-5 py-3 font-medium">Master Item</th>
-                    <th className="px-4 py-3 font-medium">Unit</th>
-                    <th className="px-4 py-3 font-medium text-right">Count</th>
-                    <th className="px-4 py-3 font-medium text-right">Weighted Avg</th>
-                    <th className="px-4 py-3 font-medium text-right">Median</th>
-                    <th className="px-4 py-3 font-medium text-right">Low</th>
-                    <th className="px-4 py-3 font-medium text-right">High</th>
+                    <SortHeader label="Master Item" sortKey="masterItem" sort={sort} onSort={toggleSort} className="px-5 py-3" />
+                    <SortHeader label="Category" sortKey="category" sort={sort} onSort={toggleSort} />
+                    <SortHeader label="Unit" sortKey="standardUnit" sort={sort} onSort={toggleSort} />
+                    <SortHeader label="Count" sortKey="count" sort={sort} onSort={toggleSort} align="right" />
+                    <SortHeader label="Weighted Avg" sortKey="weightedAvg" sort={sort} onSort={toggleSort} align="right" />
+                    <SortHeader label="Median" sortKey="median" sort={sort} onSort={toggleSort} align="right" />
+                    <SortHeader label="Low" sortKey="low" sort={sort} onSort={toggleSort} align="right" />
+                    <SortHeader label="High" sortKey="high" sort={sort} onSort={toggleSort} align="right" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {estimate.report.map((r) => (
+                  {sortedReport.map((r) => (
                     <tr key={r.recordId} className="hover:bg-gray-50 transition-colors">
                       <td className="px-5 py-3 text-gray-900">
                         {r.masterItem}
@@ -158,6 +235,7 @@ export function EstimatePanel() {
                           </span>
                         )}
                       </td>
+                      <td className="px-4 py-3 text-xs text-gray-500">{r.category}</td>
                       <td className="px-4 py-3 text-xs text-gray-500">{r.standardUnit}</td>
                       <td className="px-4 py-3 text-right font-mono text-xs text-gray-600">{r.count}</td>
                       {r.excludeFromStats ? (
@@ -188,7 +266,7 @@ export function EstimatePanel() {
               Write to Airtable
             </button>
             <button
-              onClick={() => downloadCsv(estimate.report)}
+              onClick={() => downloadCsv(sortedReport)}
               className="px-5 py-2.5 text-gray-600 text-sm font-medium rounded-lg
                 border border-gray-300 hover:bg-gray-50 transition-colors"
             >

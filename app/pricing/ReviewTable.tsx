@@ -70,7 +70,7 @@ export function ReviewTable({ records, masterItems, onReviewed }: Props) {
           <tbody className="divide-y divide-gray-50">
             {records.map((r) => (
               <tr key={r.recordId} className="hover:bg-gray-50 transition-colors">
-                <td className="px-5 py-3 text-gray-900 max-w-xs truncate" title={r.rawDescription}>
+                <td className="px-5 py-3 text-gray-900 max-w-md whitespace-normal break-words">
                   {r.rawDescription}
                 </td>
                 <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{r.rawUnit}</td>

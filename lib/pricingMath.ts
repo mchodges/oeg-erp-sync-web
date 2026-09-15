@@ -99,6 +99,7 @@ export function computeEstimateReport(
       recordId: item.id,
       masterItem: item.masterItemName,
       standardUnit: item.standardUnit,
+      category: item.category,
       count: stats?.count ?? 0,
       weightedAvg: item.excludeFromStats ? null : stats?.weightedAvg ?? null,
       median: item.excludeFromStats ? null : stats?.median ?? null,
