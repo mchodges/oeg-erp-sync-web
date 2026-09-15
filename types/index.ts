@@ -155,6 +155,7 @@ export interface MasterCatalogStat {
 export interface PricingEstimateResult {
   report: MasterCatalogStat[];
   reviewCount: number;
+  ignoredCount: number;
   today: string;
 }
 

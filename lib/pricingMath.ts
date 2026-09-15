@@ -55,7 +55,10 @@ function computeStats(pairs: { price: number; qty: number }[]): StatRow {
 
 export interface EstimateReport {
   report: MasterCatalogStat[];
+  /** Rows with no dictionary match yet AND no Ignored decision — genuinely need review. */
   reviewCount: number;
+  /** Rows explicitly marked Ignored (no match exists) — will never resolve, not a backlog. */
+  ignoredCount: number;
 }
 
 /** Port of notebook Chunk 5: resolve → clean → dedupe → group → outlier-trim → stats → merge onto catalog. */
@@ -63,8 +66,10 @@ export function computeEstimateReport(
   bidHistory: BidHistoryRow[],
   dictionaryMap: Map<string, string>,
   masterCatalog: MasterCatalogRecord[],
+  ignoredDescriptions: Set<string>,
 ): EstimateReport {
   let reviewCount = 0;
+  let ignoredCount = 0;
   const seenDupeKeys = new Set<string>();
   const groups = new Map<string, { price: number; qty: number }[]>();
 
@@ -74,7 +79,11 @@ export function computeEstimateReport(
 
     const masterItem = resolveMasterItem(row.originalDescription, dictionaryMap);
     if (masterItem === REVIEW) {
-      reviewCount++;
+      if (ignoredDescriptions.has(row.originalDescription.trim())) {
+        ignoredCount++;
+      } else {
+        reviewCount++;
+      }
       continue;
     }
 
@@ -109,5 +118,5 @@ export function computeEstimateReport(
     };
   });
 
-  return { report, reviewCount };
+  return { report, reviewCount, ignoredCount };
 }

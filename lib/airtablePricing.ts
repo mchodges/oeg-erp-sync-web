@@ -122,3 +122,14 @@ export async function fetchKnownRawDescriptions(): Promise<Set<string>> {
   const all = await fetchAllLivingMatches();
   return new Set(all.map((r) => r.rawDescription).filter(Boolean));
 }
+
+/** Raw descriptions explicitly rejected as having no Master_Catalog match — these will
+ * never resolve and should be reported separately from ones still awaiting review. */
+export async function fetchIgnoredRawDescriptions(): Promise<Set<string>> {
+  const records = await fetchAllRecords(
+    LIVING_MATCHES_TABLE(),
+    { filterByFormula: "{Status}='Ignored'" },
+    PRICING_BASE_ID(),
+  );
+  return new Set(records.map((r) => toLivingMatch(r).rawDescription).filter(Boolean));
+}

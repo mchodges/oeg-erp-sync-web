@@ -199,6 +199,13 @@ export function EstimatePanel() {
             </div>
           )}
 
+          {estimate.ignoredCount > 0 && (
+            <div className="px-5 py-3 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-500">
+              {estimate.ignoredCount.toLocaleString()} bid history rows have no catalog match
+              and were marked Ignored — excluded from pricing, no action needed.
+            </div>
+          )}
+
           <Card className="overflow-hidden">
             <div className="px-6 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-700">Pricing report</h2>
