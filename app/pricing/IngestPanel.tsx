@@ -201,7 +201,13 @@ export function IngestPanel() {
               onChange={handleFileInput}
             />
           </div>
-          <div className="text-center">
+          <div className="text-center space-x-4">
+            <button
+              onClick={scanAndMatch}
+              className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              Scan for AI matches →
+            </button>
             <button
               onClick={loadReview}
               className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
