@@ -1,3 +1,29 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.flow-node {
+  cursor: pointer;
+}
+.flow-node .flow-shape {
+  transition: filter 0.15s ease, stroke-width 0.15s ease;
+}
+.flow-node:hover .flow-shape,
+.flow-node:focus-visible .flow-shape {
+  filter: brightness(0.95) drop-shadow(0 2px 4px rgba(15, 23, 42, 0.25));
+  stroke-width: 3;
+}
+.flow-node .flow-badge {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.15s ease;
+}
+.flow-node:hover .flow-badge,
+.flow-node:focus-visible .flow-badge {
+  transform: scale(1.12);
+}
+.flow-node:focus-visible {
+  outline: 3px solid #4f46e5;
+  outline-offset: 3px;
+  border-radius: 10px;
+}

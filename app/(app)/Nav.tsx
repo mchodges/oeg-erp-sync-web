@@ -27,6 +27,7 @@ export function Nav() {
       {link("/", "Hours Sync")}
       {link("/budget", "Budget Sync")}
       {link("/pricing", "Bid Pricing")}
+      {link("/workflows", "Workflows")}
     </nav>
   );
 }
