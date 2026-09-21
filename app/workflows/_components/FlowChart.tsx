@@ -3,19 +3,19 @@ import { PARTY_NAMES } from "../_data/types";
 
 // ── Layout constants ────────────────────────────────────────────────────────
 
-const PROCESS_W = 152;
-const PROCESS_H = 88;
-const DECISION_W = 148;
-const DECISION_H = 118;
-const GAP = 44;
-const LANE_LABEL_W = 176;
-const LANE_LABEL_H = 54;
-const LANE_LABEL_GAP = 46;
-const ROW_H = 150;
+const PROCESS_W = 160;
+const PROCESS_H = 100;
+const DECISION_W = 158;
+const DECISION_H = 130;
+const GAP = 38;
+const LANE_LABEL_W = 190;
+const LANE_LABEL_H = 58;
+const LANE_LABEL_GAP = 40;
+const ROW_H = 180;
 const PAD_X = 28;
-const PAD_TOP = 34;
+const PAD_TOP = 40;
 const PAD_BOTTOM = 24;
-const BADGE_R = 15;
+const BADGE_R = 17;
 
 interface LaidOutNode extends FlowNode {
   x0: number;
@@ -99,7 +99,7 @@ function PartyBadge({ cx, topY, party, stroke }: { cx: number; topY: number; par
   return (
     <g className="flow-badge">
       <circle cx={cx} cy={topY} r={BADGE_R} fill="white" stroke={stroke} strokeWidth={1.75} />
-      <text x={cx} y={topY} textAnchor="middle" dominantBaseline="middle" fontSize={9.5} className="fill-slate-700 font-bold select-none">
+      <text x={cx} y={topY} textAnchor="middle" dominantBaseline="middle" fontSize={11} className="fill-slate-700 font-bold select-none">
         {party}
       </text>
     </g>
@@ -171,15 +171,15 @@ export function FlowChart({ data }: { data: FlowChartData }) {
 
             {/* lane label pill */}
             <rect x={lane.pillX0} y={lane.cy - LANE_LABEL_H / 2} width={LANE_LABEL_W} height={LANE_LABEL_H} rx={LANE_LABEL_H / 2} fill={lane.fill} stroke="#0f172a" strokeOpacity={0.08} strokeWidth={1} />
-            <text x={lane.pillX0 + LANE_LABEL_W / 2} y={lane.cy} textAnchor="middle" dominantBaseline="middle" fontSize={13.5} className="fill-slate-900 font-bold select-none">
+            <text x={lane.pillX0 + LANE_LABEL_W / 2} y={lane.cy} textAnchor="middle" dominantBaseline="middle" fontSize={15.5} className="fill-slate-900 font-bold select-none">
               {lane.label}
             </text>
 
             {/* nodes */}
             {lane.nodes.map((node) => {
-              const maxChars = node.shape === "decision" ? 13 : 21;
-              const fontSize = node.shape === "decision" ? 10.5 : 11;
-              const lineHeight = node.shape === "decision" ? 12.5 : 13;
+              const maxChars = node.shape === "decision" ? 12 : 18;
+              const fontSize = node.shape === "decision" ? 12.5 : 13;
+              const lineHeight = node.shape === "decision" ? 14.5 : 15;
               const lines = wrapLabel(node.label, maxChars);
               const topY = node.cy - node.h / 2;
               const partyName = PARTY_NAMES[node.party];
