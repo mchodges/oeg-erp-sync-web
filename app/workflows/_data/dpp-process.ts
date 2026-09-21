@@ -10,7 +10,7 @@ function node(
   id: string,
   label: string,
   party: FlowNode["party"],
-  opts: { shape?: FlowNode["shape"]; dashed?: boolean } = {}
+  opts: { shape?: FlowNode["shape"]; dashed?: boolean; href?: string } = {}
 ): FlowNode {
   return {
     id,
@@ -18,7 +18,7 @@ function node(
     party,
     shape: opts.shape ?? "process",
     dashed: opts.dashed,
-    href: placeholder(label),
+    href: opts.href ?? placeholder(label),
   };
 }
 
@@ -33,7 +33,9 @@ export const dppProcess: FlowChartData = {
       fill: "#a7f3d0",
       stroke: "#059669",
       nodes: [
-        node("handoff", "Project Handoff Meeting", "PM"),
+        node("handoff", "Project Handoff Meeting", "PM", {
+          href: "https://odysseyeg.sharepoint.com/sites/0EG-Development/SitePages/DPP01---Project-Handoff-Meeting.aspx",
+        }),
         node("design-planning", "Design Planning", "DM"),
         node("existing-conditions", "Existing Conditions Review", "DM"),
         node("master-planning", "Master Planning", "DM", { dashed: true }),
@@ -57,8 +59,8 @@ export const dppProcess: FlowChartData = {
     {
       id: "base-files",
       label: "Base Files Phase",
-      fill: "#fecdd3",
-      stroke: "#e11d48",
+      fill: "#ddd6fe",
+      stroke: "#7c3aed",
       nodes: [
         node("base-file-prep", "Base File Preparation", "CAD"),
         node("reconcile-hh", "Reconcile H&H Calculations to Design Files", "DE"),
