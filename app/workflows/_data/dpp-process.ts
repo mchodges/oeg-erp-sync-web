@@ -1,7 +1,42 @@
 import type { FlowChartData, FlowNode } from "./types";
 
-// TODO: swap these placeholder search links for the real SharePoint procedure
-// pages once they exist.
+// Real SharePoint procedure pages, keyed by node id. Nodes without an entry
+// fall back to a placeholder search link.
+const PROCEDURE_LINKS: Record<string, string> = {
+  handoff:
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-10-Project-Handoff.aspx",
+  "design-planning-existing-conditions":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-11-Design-Planning-%26-Existing-Conditions-Review.aspx",
+  "master-planning":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-12-Master-Planning.aspx",
+  "predesign-agency":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-13-Pre-Design-Agency-Meeting.aspx",
+  "constructability-1":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-14-Constructability-Review.aspx",
+  "one-line":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-20-One-Line-Design.aspx",
+  "hh-calcs":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-21-H%26H-Calculations.aspx",
+  "calc-site-plan":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-22-Calculated-Site-Plan-Review.aspx",
+  "surface-model":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-23-Surface%20Model.aspx",
+  "base-file-prep":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-30-Base-File-Preparation.aspx",
+  "reconcile-hh":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-31-Reconcile-H%26H-Calculations.aspx",
+  "land-site-review":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-32-Site-Plan-%26-Easement-Review.aspx",
+  kickoff:
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-40-Plan-Production-Kickoff-Meeting.aspx",
+  "sheet-cut-review":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-41-Sheet-Cut-Review.aspx",
+  "plan-production":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-42-Plan-Production.aspx",
+  "initial-submittal":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-43-Intial-Submittal-%26-Composite-Set.aspx",
+};
+
 function placeholder(label: string): string {
   return `https://www.google.com/search?q=${encodeURIComponent(label)}`;
 }
@@ -10,7 +45,7 @@ function node(
   id: string,
   label: string,
   party: FlowNode["party"],
-  opts: { shape?: FlowNode["shape"]; dashed?: boolean; href?: string } = {}
+  opts: { shape?: FlowNode["shape"]; dashed?: boolean } = {}
 ): FlowNode {
   return {
     id,
@@ -18,7 +53,7 @@ function node(
     party,
     shape: opts.shape ?? "process",
     dashed: opts.dashed,
-    href: opts.href ?? placeholder(label),
+    href: PROCEDURE_LINKS[id] ?? placeholder(label),
   };
 }
 
@@ -33,11 +68,8 @@ export const dppProcess: FlowChartData = {
       fill: "#a7f3d0",
       stroke: "#059669",
       nodes: [
-        node("handoff", "Project Handoff Meeting", "PM", {
-          href: "https://odysseyeg.sharepoint.com/sites/0EG-Development/SitePages/DPP01---Project-Handoff-Meeting.aspx",
-        }),
-        node("design-planning", "Design Planning", "DM"),
-        node("existing-conditions", "Existing Conditions Review", "DM"),
+        node("handoff", "Project Handoff Meeting", "PM"),
+        node("design-planning-existing-conditions", "Design Planning & Existing Conditions Review", "DM"),
         node("master-planning", "Master Planning", "DM", { dashed: true }),
         node("predesign-agency", "Pre-Design Agency Meeting", "DM", { dashed: true }),
         node("constructability-1", "Constructability Review", "SR", { dashed: true }),
