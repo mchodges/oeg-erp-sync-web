@@ -35,6 +35,24 @@ const PROCEDURE_LINKS: Record<string, string> = {
     "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-42-Plan-Production.aspx",
   "initial-submittal":
     "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-43-Intial-Submittal-%26-Composite-Set.aspx",
+  "constructability-2":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-14-Constructability-Review.aspx",
+  "engineering-qaqc":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-51-Engineering-QAQC.aspx",
+  "add-comments":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-52-Add-Comments-to-Composite-as-Received.aspx",
+  "agency-coordination":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-53-Agency-Coordination-Call---Meeting.aspx",
+  "long-lead-comments":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-54-Address-Long-Lead-Agency-Comments.aspx",
+  "address-composite":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-60-Address-Composite-Set.aspx",
+  "confirm-comments":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-61-Confirm-ALL-Composite-Comments-are-Addressed.aspx",
+  "submit-approval":
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-62-Submit-for-Approval.aspx",
+  paar:
+    "https://odysseyeg.sharepoint.com/sites/OEG/SitePages/DPP-63-Project-After-Action-Report-(PAAR).aspx",
 };
 
 function placeholder(label: string): string {
@@ -134,7 +152,7 @@ export const dppProcess: FlowChartData = {
       stroke: "#65a30d",
       nodes: [
         node("address-composite", "Address Composite Set", "CAD"),
-        node("confirm-comments", "Confirm ALL composite set comments are addressed", "DE"),
+        node("confirm-comments", "Confirm ALL comments are addressed", "DE"),
         node("signs-seals", "Engineer Signs & Seals Plans", "DM", { shape: "decision" }),
         node("submit-approval", "Submit for Approval", "DE"),
         node("plans-approved", "Plans Approved", "AGY", { shape: "decision" }),
