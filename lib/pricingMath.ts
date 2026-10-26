@@ -92,6 +92,11 @@ export function computeEstimateReport(
       continue;
     }
 
+    // A line with no quantity bids no work (contract-clause lines such as a per-day bonus or a
+    // damage deduct are listed at qty 0), so its price says nothing about unit cost. Skipped here,
+    // after the review/ignored counting above, so those banner counts stay accurate.
+    if (row.qty <= 0) continue;
+
     const dupeKey = `${row.projectName ?? ""}|${row.contractor}|${masterItem}|${row.price}`;
     if (seenDupeKeys.has(dupeKey)) continue;
     seenDupeKeys.add(dupeKey);
