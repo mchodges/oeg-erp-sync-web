@@ -62,7 +62,9 @@ function toCsv(report: MasterCatalogStat[]): string {
 }
 
 function downloadCsv(report: MasterCatalogStat[]) {
-  const blob = new Blob([toCsv(report)], { type: "text/csv" });
+  // The leading BOM tells Excel the file is UTF-8; without it Excel on Windows reads it as
+  // ANSI and garbles non-ASCII characters such as the em dash in the Notes column.
+  const blob = new Blob(["﻿" + toCsv(report)], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
