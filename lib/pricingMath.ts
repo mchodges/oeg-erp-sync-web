@@ -74,7 +74,11 @@ export function computeEstimateReport(
   const seenDupeKeys = new Set<string>();
   const groups = new Map<string, { price: number; qty: number }[]>();
 
-  for (const row of bidHistory) {
+  // The dedupe below keeps the first line seen per project+contractor+item+price, so the
+  // order must be fixed: oldest ingested row (lowest id) wins, the same on every run.
+  const ordered = [...bidHistory].sort((a, b) => a.id - b.id);
+
+  for (const row of ordered) {
     if (!Number.isFinite(row.price) || row.price <= 0) continue;
     if (!Number.isFinite(row.qty)) continue;
 

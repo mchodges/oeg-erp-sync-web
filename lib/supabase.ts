@@ -46,6 +46,7 @@ function table(): any {
 }
 
 export interface BidHistoryRow {
+  id: number;
   sourceFile: string;
   projectName: string | null;
   bidDate: string | null;
@@ -58,6 +59,7 @@ export interface BidHistoryRow {
 
 function fromDbRow(r: BidHistoryDbRow): BidHistoryRow {
   return {
+    id: r.id,
     sourceFile: r.source_file,
     projectName: r.project_name,
     bidDate: r.bid_date,
@@ -148,6 +150,9 @@ export async function fetchAllBidHistory(): Promise<BidHistoryRow[]> {
   for (;;) {
     const { data, error } = await table()
       .select("id, source_file, project_name, bid_date, contractor, original_description, qty, unit, price")
+      // Without an ORDER BY, Postgres may return rows in any order, so paging can skip or
+      // repeat rows and the estimate dedupe (first row wins) can pick a different line each run.
+      .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
 
     if (error) throw new Error(`Supabase select failed: ${error.message}`);
