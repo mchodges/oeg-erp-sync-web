@@ -1,6 +1,7 @@
 import type { MasterCatalogStat } from "@/types";
 import type { BidHistoryRow } from "./supabase";
 import type { MasterCatalogRecord } from "./airtablePricing";
+import { normalizeDescription } from "./normalizeText";
 
 const REVIEW = "REVIEW";
 const OUTLIER_TRIM_PCT = 0.1;
@@ -14,7 +15,7 @@ export function resolveMasterItem(
   description: string,
   dictionaryMap: Map<string, string>,
 ): string {
-  return dictionaryMap.get(description.trim()) ?? REVIEW;
+  return dictionaryMap.get(normalizeDescription(description)) ?? REVIEW;
 }
 
 interface StatRow {
@@ -79,7 +80,7 @@ export function computeEstimateReport(
 
     const masterItem = resolveMasterItem(row.originalDescription, dictionaryMap);
     if (masterItem === REVIEW) {
-      if (ignoredDescriptions.has(row.originalDescription.trim())) {
+      if (ignoredDescriptions.has(normalizeDescription(row.originalDescription))) {
         ignoredCount++;
       } else {
         reviewCount++;

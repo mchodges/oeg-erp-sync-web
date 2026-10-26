@@ -1,5 +1,6 @@
 import { fetchAllRecords, normalizeLinkedIds, type AirtableRecord } from "./airtable";
 import type { MasterCatalogOption } from "@/types";
+import { normalizeDescription } from "./normalizeText";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -107,20 +108,23 @@ export async function buildDictionaryMap(): Promise<Map<string, string>> {
     fetchVerifiedLivingMatches(),
   ]);
 
+  // Keys are normalizeDescription() forms; look up with the same function.
   const map = new Map<string, string>();
   for (const item of catalog) {
-    if (item.masterItemName) map.set(item.masterItemName, item.id);
+    if (item.masterItemName) map.set(normalizeDescription(item.masterItemName), item.id);
   }
   for (const row of verified) {
-    if (row.rawDescription && row.masterItemId) map.set(row.rawDescription, row.masterItemId);
+    if (row.rawDescription && row.masterItemId) {
+      map.set(normalizeDescription(row.rawDescription), row.masterItemId);
+    }
   }
   return map;
 }
 
-/** Every raw description that already has a Living_Matches row, regardless of status. */
+/** Every raw description that already has a Living_Matches row, regardless of status (normalized keys). */
 export async function fetchKnownRawDescriptions(): Promise<Set<string>> {
   const all = await fetchAllLivingMatches();
-  return new Set(all.map((r) => r.rawDescription).filter(Boolean));
+  return new Set(all.map((r) => normalizeDescription(r.rawDescription)).filter(Boolean));
 }
 
 /** Raw descriptions explicitly rejected as having no Master_Catalog match — these will
@@ -131,5 +135,7 @@ export async function fetchIgnoredRawDescriptions(): Promise<Set<string>> {
     { filterByFormula: "{Status}='Ignored'" },
     PRICING_BASE_ID(),
   );
-  return new Set(records.map((r) => toLivingMatch(r).rawDescription).filter(Boolean));
+  return new Set(
+    records.map((r) => normalizeDescription(toLivingMatch(r).rawDescription)).filter(Boolean),
+  );
 }

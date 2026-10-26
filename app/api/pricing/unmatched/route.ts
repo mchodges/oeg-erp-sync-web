@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchAllBidHistory } from "@/lib/supabase";
 import { buildDictionaryMap, fetchKnownRawDescriptions } from "@/lib/airtablePricing";
+import { normalizeDescription } from "@/lib/normalizeText";
 import type { UnmatchedItem, UnmatchedItemsResult } from "@/types";
 
 export async function GET() {
@@ -16,11 +17,12 @@ export async function GET() {
 
     for (const row of bidHistory) {
       const desc = row.originalDescription.trim();
-      if (!desc || seen.has(desc)) continue;
-      seen.add(desc);
+      const key = normalizeDescription(desc);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
 
-      if (dictionaryMap.has(desc)) continue; // already resolves
-      if (knownDescriptions.has(desc)) continue; // already has a Living_Matches row (any status)
+      if (dictionaryMap.has(key)) continue; // already resolves
+      if (knownDescriptions.has(key)) continue; // already has a Living_Matches row (any status)
 
       items.push({ description: desc, unit: row.unit });
     }

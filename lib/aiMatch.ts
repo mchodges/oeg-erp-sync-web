@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { MatchConfidence, UnmatchedItem } from "@/types";
 import type { MasterCatalogRecord } from "./airtablePricing";
+import { normalizeDescription } from "./normalizeText";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
@@ -121,12 +122,28 @@ Call record_matches with one entry per new item, in the same order given.`;
     }[];
   };
 
-  return input.matches.map((m) => ({
-    rawDescription: m.raw_description,
-    rawUnit: m.raw_unit,
-    aiGuess: m.ai_guessed_master_item,
-    confidence: (["High", "Medium", "Low"].includes(m.confidence)
-      ? m.confidence
-      : "Low") as MatchConfidence,
-  }));
+  // Claude re-types the description it echoes (curly quotes come back straight),
+  // so never store its copy: pair each guess with the input item it belongs to and
+  // keep the input's exact text, which is what every later lookup compares against.
+  const used = new Set<number>();
+  return items.flatMap((item, i) => {
+    const key = normalizeDescription(item.description);
+    let idx = input.matches.findIndex(
+      (m, j) => !used.has(j) && normalizeDescription(m.raw_description) === key,
+    );
+    if (idx === -1 && input.matches.length === items.length && !used.has(i)) idx = i;
+    if (idx === -1) return [];
+    used.add(idx);
+    const m = input.matches[idx];
+    return [
+      {
+        rawDescription: item.description,
+        rawUnit: m.raw_unit,
+        aiGuess: m.ai_guessed_master_item,
+        confidence: (["High", "Medium", "Low"].includes(m.confidence)
+          ? m.confidence
+          : "Low") as MatchConfidence,
+      },
+    ];
+  });
 }

@@ -3,12 +3,14 @@ import { createRecords } from "@/lib/airtable";
 import {
   catalogIdToName,
   catalogNameToId,
+  fetchKnownRawDescriptions,
   fetchMasterCatalog,
   fetchVerifiedLivingMatches,
   LIVING_MATCHES_TABLE,
   PRICING_BASE_ID,
 } from "@/lib/airtablePricing";
 import { matchBatch, type FewShotExample } from "@/lib/aiMatch";
+import { normalizeDescription } from "@/lib/normalizeText";
 import type { LivingMatchGuess, UnmatchedItem } from "@/types";
 
 export const maxDuration = 60;
@@ -20,15 +22,23 @@ function sampleFewShot(verified: FewShotExample[], n: number): FewShotExample[] 
 
 export async function POST(req: NextRequest) {
   try {
-    const { items } = (await req.json()) as { items: UnmatchedItem[] };
-    if (!items?.length) {
+    const { items: requested } = (await req.json()) as { items: UnmatchedItem[] };
+    if (!requested?.length) {
       return NextResponse.json({ error: "No items provided." }, { status: 400 });
     }
 
-    const [catalog, verified] = await Promise.all([
+    const [catalog, verified, known] = await Promise.all([
       fetchMasterCatalog(),
       fetchVerifiedLivingMatches(),
+      fetchKnownRawDescriptions(),
     ]);
+
+    // Guard against double scans (two tabs, a retried batch): never create a second
+    // Living_Matches row for a description that already has one in any status.
+    const items = requested.filter((i) => !known.has(normalizeDescription(i.description)));
+    if (items.length === 0) {
+      return NextResponse.json({ created: [] });
+    }
 
     const idToName = catalogIdToName(catalog);
     const nameToId = catalogNameToId(catalog);
