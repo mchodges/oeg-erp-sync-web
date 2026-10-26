@@ -13,12 +13,18 @@ export async function POST(req: NextRequest) {
     }
 
     const results: HarvestFileResult[] = [];
+    const batchSeen = new Set<string>();
 
     for (const file of files) {
       try {
         const buffer = await file.arrayBuffer();
         const { projectName, bidDate, rows } = parseBidTab(buffer);
-        const { newRows, duplicateRows } = await filterNewRows(file.name, rows);
+        const { newRows, duplicateRows, duplicateOfFiles } = await filterNewRows(
+          file.name,
+          projectName,
+          rows,
+          batchSeen,
+        );
 
         results.push({
           filename: file.name,
@@ -27,6 +33,7 @@ export async function POST(req: NextRequest) {
           totalRows: rows.length,
           newRows: newRows.length,
           duplicateRows: duplicateRows.length,
+          duplicateOfFiles,
           rows: newRows,
         });
       } catch (e) {

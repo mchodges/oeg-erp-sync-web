@@ -262,6 +262,11 @@ export function IngestPanel() {
                         <p className="text-xs text-gray-500 mt-0.5">
                           {f.projectName ?? "Unknown project"} · {f.bidDate ?? "Unknown date"}
                         </p>
+                        {f.duplicateOfFiles && f.duplicateOfFiles.length > 0 && (
+                          <p className="text-xs text-amber-700 mt-0.5">
+                            Same rows already ingested from: {f.duplicateOfFiles.join(", ")}
+                          </p>
+                        )}
                       </div>
                       <div className="text-xs text-gray-500 whitespace-nowrap">
                         <span className="font-semibold text-gray-900">{f.newRows}</span> new

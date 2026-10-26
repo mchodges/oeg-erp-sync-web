@@ -75,23 +75,55 @@ function dedupeKey(contractor: string, description: string, qty: number, price: 
   return `${contractor}${description}${qty}${price}`;
 }
 
-/** Splits rows already parsed from a file into new vs. already-ingested (by dedup key), scoped to that filename. */
+type KeyRow = Pick<
+  BidHistoryDbRow,
+  "contractor" | "original_description" | "qty" | "price" | "source_file"
+>;
+
+/** Reads every matching row; PostgREST caps a single response at 1,000 rows. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function selectAllKeyRows(filter: (q: any) => any): Promise<KeyRow[]> {
+  const out: KeyRow[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await filter(
+      table().select("contractor, original_description, qty, price, source_file"),
+    )
+      .order("id", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(`Supabase select failed: ${error.message}`);
+    const page = (data ?? []) as KeyRow[];
+    out.push(...page);
+    if (page.length < PAGE_SIZE) break;
+  }
+  return out;
+}
+
+/** Same line item regardless of which file it came from (a renamed copy of a bid tab). */
+function contentKey(
+  projectName: string | null,
+  contractor: string,
+  description: string,
+  qty: number,
+  price: number,
+): string {
+  return JSON.stringify([projectName ?? "", contractor, description, Number(qty), Number(price)]);
+}
+
+/**
+ * Splits rows already parsed from a file into new vs. already-ingested. A row is a
+ * duplicate if the same line exists under this filename (dedup key), under ANY other
+ * filename for the same project (a renamed or re-downloaded copy), or in an earlier
+ * file of the same upload (`batchSeen`, shared across the files of one request).
+ */
 export async function filterNewRows(
   filename: string,
+  projectName: string | null,
   rows: RawBidRow[],
-): Promise<{ newRows: RawBidRow[]; duplicateRows: RawBidRow[] }> {
-  const { data, error } = await table()
-    .select("contractor, original_description, qty, price")
-    .eq("source_file", filename);
-
-  if (error) throw new Error(`Supabase select failed: ${error.message}`);
-
-  const existingRows = (data ?? []) as Pick<
-    BidHistoryDbRow,
-    "contractor" | "original_description" | "qty" | "price"
-  >[];
-  const existingKeys = new Set(
-    existingRows.map((r) =>
+  batchSeen: Set<string> = new Set(),
+): Promise<{ newRows: RawBidRow[]; duplicateRows: RawBidRow[]; duplicateOfFiles: string[] }> {
+  const sameFile = await selectAllKeyRows((q) => q.eq("source_file", filename));
+  const sameFileKeys = new Set(
+    sameFile.map((r) =>
       dedupeKey(
         String(r.contractor),
         String(r.original_description),
@@ -101,14 +133,46 @@ export async function filterNewRows(
     ),
   );
 
+  const otherFiles = await selectAllKeyRows((q) =>
+    (projectName === null ? q.is("project_name", null) : q.eq("project_name", projectName)).neq(
+      "source_file",
+      filename,
+    ),
+  );
+  const otherFileByKey = new Map<string, string>();
+  for (const r of otherFiles) {
+    otherFileByKey.set(
+      contentKey(projectName, r.contractor, r.original_description, r.qty, r.price),
+      r.source_file,
+    );
+  }
+
   const newRows: RawBidRow[] = [];
   const duplicateRows: RawBidRow[] = [];
+  const duplicateOfFiles = new Set<string>();
   for (const row of rows) {
     const key = dedupeKey(row.contractor, row.originalDescription, row.qty, row.price);
-    if (existingKeys.has(key)) duplicateRows.push(row);
-    else newRows.push(row);
+    const ckey = contentKey(projectName, row.contractor, row.originalDescription, row.qty, row.price);
+    const other = otherFileByKey.get(ckey);
+    if (sameFileKeys.has(key)) {
+      duplicateRows.push(row);
+    } else if (other) {
+      duplicateRows.push(row);
+      duplicateOfFiles.add(other);
+    } else if (batchSeen.has(ckey)) {
+      duplicateRows.push(row);
+      duplicateOfFiles.add("another file in this upload");
+    } else {
+      newRows.push(row);
+    }
   }
-  return { newRows, duplicateRows };
+  // Remember this file's new rows only after classifying it, so repeats inside one file are unaffected.
+  for (const row of newRows) {
+    batchSeen.add(
+      contentKey(projectName, row.contractor, row.originalDescription, row.qty, row.price),
+    );
+  }
+  return { newRows, duplicateRows, duplicateOfFiles: [...duplicateOfFiles] };
 }
 
 export async function insertBidHistoryRows(

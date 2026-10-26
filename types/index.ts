@@ -86,6 +86,8 @@ export interface HarvestFileResult {
   totalRows: number;
   newRows: number;
   duplicateRows: number;
+  /** Other filenames (or this upload) that already contain some of this file's rows. */
+  duplicateOfFiles?: string[];
   rows: RawBidRow[];
   error?: string;
 }
