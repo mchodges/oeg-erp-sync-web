@@ -24,14 +24,32 @@ function fixMojibake(s: string): string {
     [/â€™/g, "'"], // U+2019 right single quote
     [/â€œ/g, '"'], // U+201C left double quote
     [/â€[\udc9d]/g, '"'], // U+201D right double quote (unmapped cp1252 byte -> surrogate)
+    [/\u00e2\u20ac\u201c/g, "\u2013"], // en dash (E2 80 93 read as cp1252)
+    [/\u00e2\u20ac\u201d/g, "\u2014"], // em dash (E2 80 94 read as cp1252)
+    [/\u00e2\u20ac\u00a6/g, "\u2026"], // ellipsis (E2 80 A6)
+    [/\u00e2\u20ac\u00a2/g, "\u2022"], // bullet (E2 80 A2)
+    [/\u00c2([\u00a0-\u00bf])/g, "$1"], // degree, half, plus-minus, NBSP... (C2 xx read as cp1252)
   ];
   let out = s;
   for (const [pattern, repl] of replacements) out = out.replace(pattern, repl);
-  return out.replace(/[\uD800-\uDFFF]/g, ""); // strip any remaining unpaired surrogate
+  // Strip only UNPAIRED surrogates; a valid pair (e.g. an emoji) is a real character.
+  return out.replace(
+    /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g,
+    "",
+  );
 }
 
 function cellStr(v: unknown): string {
   return v == null ? "" : fixMojibake(String(v).trim());
+}
+
+/**
+ * Line-item description: repaired like any cell, and any run of whitespace (NBSP, tab,
+ * newline, double space) collapsed to one space so the stored text is a clean single line.
+ * Kept to descriptions only - contractor and project names are stored as typed.
+ */
+function descriptionStr(v: unknown): string {
+  return cellStr(v).replace(/\s+/g, " ");
 }
 
 function findHeaderRowIndex(rawRows: unknown[][]): number | null {
@@ -106,7 +124,7 @@ export function parseBidTab(buffer: ArrayBuffer): BidTabParseResult {
   const rows: RawBidRow[] = [];
 
   for (const row of rawRows.slice(headerIdx + 1)) {
-    const rawDesc = cellStr(row[descIdx]);
+    const rawDesc = descriptionStr(row[descIdx]);
     const rawQty = row[qtyIdx];
 
     if (!rawDesc || rawDesc.toUpperCase() === "DESCRIPTION") continue;

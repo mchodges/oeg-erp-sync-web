@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { RawBidRow } from "@/types";
+import { normalizeDescription } from "./normalizeText";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -72,7 +73,7 @@ function fromDbRow(r: BidHistoryDbRow): BidHistoryRow {
 }
 
 function dedupeKey(contractor: string, description: string, qty: number, price: number): string {
-  return `${contractor}${description}${qty}${price}`;
+  return `${contractor}${normalizeDescription(description)}${qty}${price}`;
 }
 
 type KeyRow = Pick<
@@ -106,7 +107,13 @@ function contentKey(
   qty: number,
   price: number,
 ): string {
-  return JSON.stringify([projectName ?? "", contractor, description, Number(qty), Number(price)]);
+  return JSON.stringify([
+    projectName ?? "",
+    contractor,
+    normalizeDescription(description),
+    Number(qty),
+    Number(price),
+  ]);
 }
 
 /**
