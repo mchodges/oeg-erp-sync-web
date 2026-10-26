@@ -1,14 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { updateRecords } from "@/lib/airtable";
 import { MASTER_CATALOG_TABLE, PRICING_BASE_ID } from "@/lib/airtablePricing";
-import type { EstimateSyncResult, MasterCatalogStat } from "@/types";
+import { generateEstimate } from "@/lib/estimate";
+import type { EstimateSyncResult } from "@/types";
 
 export const maxDuration = 60;
 
-export async function POST(req: NextRequest) {
+/**
+ * Recomputes the report on the server instead of trusting a report posted by the browser,
+ * so this endpoint can only ever write what the data actually says.
+ */
+export async function POST() {
   try {
-    const { report } = (await req.json()) as { report: MasterCatalogStat[] };
-    const today = new Date().toISOString().split("T")[0];
+    const { report, today } = await generateEstimate();
 
     const updated = await updateRecords(
       MASTER_CATALOG_TABLE(),

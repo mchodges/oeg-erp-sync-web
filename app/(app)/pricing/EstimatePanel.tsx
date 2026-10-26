@@ -146,11 +146,8 @@ export function EstimatePanel() {
     if (!estimate) return;
     setAppState("writing");
     try {
-      const res = await fetch("/api/pricing/estimate-sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ report: estimate.report }),
-      });
+      // The server recomputes the report itself; nothing from the browser is written.
+      const res = await fetch("/api/pricing/estimate-sync", { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `Server error ${res.status}`);
       setSyncResult(data as EstimateSyncResult);

@@ -43,6 +43,12 @@ Required scopes on the **DPP Projects** base (Hours/Budget Sync) and the
 
 Every push to `main` re-deploys automatically.
 
+**Optional password for the Bid Pricing tool.** Add `APP_PASSWORD` (and optionally
+`APP_USERNAME`, default `oeg`) in the Vercel project's environment variables and
+redeploy. The browser then asks for the username/password before showing `/pricing`
+or calling `/api/pricing/*`. If `APP_PASSWORD` is not set the tool stays open.
+`/workflows` (embedded in SharePoint) and the other tools are not affected.
+
 ### Option B — Vercel CLI
 
 ```bash
