@@ -13,6 +13,9 @@ const ALIASES: Record<string, string> = {
   ACRES: "AC",
 };
 
+/** Units a new Master_Catalog item may use (the Standard_Unit choices; TONS is the legacy spelling of TON). */
+export const CATALOG_UNITS = ["SY", "LF", "EA", "TON", "AC", "LS", "CY", "VF", "DAY", "SF"] as const;
+
 /** Upper-cases a unit and folds spelling variants together (TONS → TON, "Each" → EA). */
 export function normalizeUnit(unit: string | null | undefined): string {
   const key = String(unit ?? "").toUpperCase().replace(/[^A-Z]/g, "");

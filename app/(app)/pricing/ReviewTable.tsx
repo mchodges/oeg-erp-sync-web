@@ -5,11 +5,14 @@ import type { LivingMatchRecord, MasterCatalogOption } from "@/types";
 import { unitsConflict } from "@/lib/units";
 import { Card, ConfidenceBadge } from "./ui";
 import { MasterItemPicker } from "./MasterItemPicker";
+import { AddCatalogItemDialog } from "./AddCatalogItemDialog";
 
 interface Props {
   records: LivingMatchRecord[];
   masterItems: MasterCatalogOption[];
   onReviewed: (recordId: string) => void;
+  /** A new item was just created in the catalog; add it to the list the pickers show. */
+  onCatalogItemAdded: (item: MasterCatalogOption) => void;
 }
 
 type SortKey = "rawDescription" | "rawUnit" | "confidence" | "masterItem";
@@ -21,7 +24,8 @@ const BULK_CONCURRENCY = 4;
 
 const isNoMatch = (guess: string) => guess.trim().toUpperCase() === "NO MATCH";
 
-export function ReviewTable({ records, masterItems, onReviewed }: Props) {
+export function ReviewTable({ records, masterItems, onReviewed, onCatalogItemAdded }: Props) {
+  const [adding, setAdding] = useState<LivingMatchRecord | null>(null);
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -341,6 +345,7 @@ export function ReviewTable({ records, masterItems, onReviewed }: Props) {
                       disabled={pending[r.recordId]}
                       rowUnit={r.rawUnit}
                       suggestedId={itemByName.get(r.aiGuess)?.id}
+                      onAddNew={() => setAdding(r)}
                     />
                     {aiNoMatch && !choiceFor(r) && (
                       <p className="mt-1 text-[11px] text-gray-500">
@@ -379,6 +384,21 @@ export function ReviewTable({ records, masterItems, onReviewed }: Props) {
           </tbody>
         </table>
       </div>
+
+      {adding && (
+        <AddCatalogItemDialog
+          record={adding}
+          items={masterItems}
+          onCancel={() => setAdding(null)}
+          onAdded={(item) => {
+            const target = adding;
+            setAdding(null);
+            onCatalogItemAdded(item);
+            setChoices((c) => ({ ...c, [target.recordId]: item.id }));
+            review(target.recordId, "approve", item.id);
+          }}
+        />
+      )}
     </Card>
   );
 }

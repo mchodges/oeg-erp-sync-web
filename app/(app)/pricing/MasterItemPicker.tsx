@@ -4,21 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { MasterCatalogOption } from "@/types";
 import { unitsConflict } from "@/lib/units";
-
-/** Work-sequence order of the Master_Catalog categories; anything else follows alphabetically. */
-const CATEGORY_ORDER = [
-  "clearing, grubbing, and site preparation",
-  "water distribution system",
-  "wastewater collection system",
-  "storm water collection system",
-  "detention basin",
-  "amenity lake",
-  "low impact development landscaping",
-  "excavation and paving",
-  "boring & casing",
-  "swppp",
-  "miscellaneous",
-];
+import { categoryRank } from "@/lib/catalogCategories";
 
 const SUGGESTED = "__suggested__";
 
@@ -37,12 +23,8 @@ function groupItems(items: MasterCatalogOption[], suggested: MasterCatalogOption
     if (group) group.items.push(item);
     else byKey.set(key, { key, label, items: [item] });
   }
-  const rank = (key: string) => {
-    const i = CATEGORY_ORDER.indexOf(key);
-    return i === -1 ? (key === "uncategorized" ? 1001 : 1000) : i;
-  };
   const groups = [...byKey.values()].sort(
-    (a, b) => rank(a.key) - rank(b.key) || a.label.localeCompare(b.label),
+    (a, b) => categoryRank(a.key) - categoryRank(b.key) || a.label.localeCompare(b.label),
   );
   for (const g of groups) {
     g.items.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));

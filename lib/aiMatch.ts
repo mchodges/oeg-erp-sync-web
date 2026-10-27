@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { MatchConfidence, UnmatchedItem } from "@/types";
 import type { MasterCatalogRecord } from "./airtablePricing";
 import { normalizeDescription } from "./normalizeText";
+import { CATALOG_UNITS } from "./units";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
@@ -58,6 +59,81 @@ const RECORD_MATCHES_TOOL: Anthropic.Tool = {
     required: ["matches"],
   },
 };
+
+export interface CatalogItemProposal {
+  name: string;
+  unit: string;
+  category: string;
+}
+
+/**
+ * Suggests how a bid line with no catalog item should be added to the catalog: a short
+ * name in the catalog's own style, a unit and a category. The reviewer edits it before saving.
+ */
+export async function proposeCatalogItem(
+  description: string,
+  rawUnit: string,
+  catalog: MasterCatalogRecord[],
+  categories: string[],
+): Promise<CatalogItemProposal> {
+  const catalogText = catalog
+    .filter((c) => c.masterItemName)
+    .map((c) => `${c.masterItemName} | ${c.standardUnit} | ${c.category}`)
+    .join("\n");
+
+  const prompt = `You are an expert civil engineering estimator maintaining a Master Catalog of bid line items.
+A bid line has no suitable catalog item. Propose a new catalog entry for it.
+
+RULES:
+1. NAME: short, generic and reusable across projects, in the same style as the existing names below
+   (size first, then material/spec, then the item, e.g. "36-Inch, HPP Storm Sewer"). Drop boilerplate such as
+   "furnish and install", "complete in place", spec section references and project-specific wording.
+   Keep every size or spec that changes the price.
+2. UNIT: the unit the item is priced in. The bid line's unit is a strong hint.
+3. CATEGORY: choose the closest existing category.
+
+EXISTING CATALOG (Master_Item_Name | Standard_Unit | Category):
+${catalogText}
+
+BID LINE:
+${JSON.stringify({ Raw_Description: description, Raw_Unit: rawUnit })}
+
+Call propose_catalog_item.`;
+
+  const response = await anthropic().messages.create({
+    model: MODEL,
+    max_tokens: 512,
+    temperature: 0.1,
+    tools: [
+      {
+        name: "propose_catalog_item",
+        description: "Records the proposed new Master Catalog entry.",
+        input_schema: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            unit: { type: "string", enum: [...CATALOG_UNITS] },
+            category: { type: "string", enum: categories },
+          },
+          required: ["name", "unit", "category"],
+        },
+      },
+    ],
+    tool_choice: { type: "tool", name: "propose_catalog_item" },
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const toolUse = response.content.find(
+    (block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
+  );
+  if (!toolUse) throw new Error("Claude did not return a propose_catalog_item tool call.");
+  const input = toolUse.input as Partial<CatalogItemProposal>;
+  return {
+    name: String(input.name ?? "").trim(),
+    unit: String(input.unit ?? ""),
+    category: String(input.category ?? ""),
+  };
+}
 
 /** Batch-matches new raw line-item descriptions to Master Catalog items via Claude (notebook Chunk 6, adapted). */
 export async function matchBatch(

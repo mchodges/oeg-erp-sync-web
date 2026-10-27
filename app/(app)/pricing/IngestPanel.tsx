@@ -162,6 +162,12 @@ export function IngestPanel() {
     setReviewRecords((records) => records.filter((r) => r.recordId !== recordId));
   }, []);
 
+  const handleCatalogItemAdded = useCallback((item: MasterCatalogOption) => {
+    setMasterItems((items) =>
+      [...items, item].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
+    );
+  }, []);
+
   return (
     <div className="space-y-5">
       {appState === "idle" && (
@@ -372,7 +378,12 @@ export function IngestPanel() {
 
       {appState === "review" && (
         <>
-          <ReviewTable records={reviewRecords} masterItems={masterItems} onReviewed={handleReviewed} />
+          <ReviewTable
+            records={reviewRecords}
+            masterItems={masterItems}
+            onReviewed={handleReviewed}
+            onCatalogItemAdded={handleCatalogItemAdded}
+          />
           <div className="flex items-center gap-3">
             <button
               onClick={reset}
