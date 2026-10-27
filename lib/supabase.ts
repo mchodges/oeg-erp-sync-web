@@ -127,7 +127,13 @@ export async function filterNewRows(
   projectName: string | null,
   rows: RawBidRow[],
   batchSeen: Set<string> = new Set(),
-): Promise<{ newRows: RawBidRow[]; duplicateRows: RawBidRow[]; duplicateOfFiles: string[] }> {
+): Promise<{
+  newRows: RawBidRow[];
+  duplicateRows: RawBidRow[];
+  /** Lines repeated inside this same file (identical contractor, description, qty and price). */
+  repeatedRows: RawBidRow[];
+  duplicateOfFiles: string[];
+}> {
   const sameFile = await selectAllKeyRows((q) => q.eq("source_file", filename));
   const sameFileKeys = new Set(
     sameFile.map((r) =>
@@ -156,6 +162,8 @@ export async function filterNewRows(
 
   const newRows: RawBidRow[] = [];
   const duplicateRows: RawBidRow[] = [];
+  const repeatedRows: RawBidRow[] = [];
+  const seenInThisFile = new Set<string>();
   const duplicateOfFiles = new Set<string>();
   for (const row of rows) {
     const key = dedupeKey(row.contractor, row.originalDescription, row.qty, row.price);
@@ -169,7 +177,12 @@ export async function filterNewRows(
     } else if (batchSeen.has(ckey)) {
       duplicateRows.push(row);
       duplicateOfFiles.add("another file in this upload");
+    } else if (seenInThisFile.has(key)) {
+      // The table can hold only one copy of an identical line per file, so say so up front
+      // instead of letting the insert drop it silently.
+      repeatedRows.push(row);
     } else {
+      seenInThisFile.add(key);
       newRows.push(row);
     }
   }
@@ -179,7 +192,7 @@ export async function filterNewRows(
       contentKey(projectName, row.contractor, row.originalDescription, row.qty, row.price),
     );
   }
-  return { newRows, duplicateRows, duplicateOfFiles: [...duplicateOfFiles] };
+  return { newRows, duplicateRows, repeatedRows, duplicateOfFiles: [...duplicateOfFiles] };
 }
 
 export async function insertBidHistoryRows(

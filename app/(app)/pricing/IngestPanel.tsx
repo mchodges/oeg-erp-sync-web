@@ -271,10 +271,43 @@ export function IngestPanel() {
                       <div className="text-xs text-gray-500 whitespace-nowrap">
                         <span className="font-semibold text-gray-900">{f.newRows}</span> new
                         {f.duplicateRows > 0 && (
-                          <span className="text-gray-400"> · {f.duplicateRows} duplicate</span>
+                          <span className="text-gray-400">
+                            {" "}
+                            · {f.duplicateRows} already in history
+                          </span>
+                        )}
+                        {(f.repeatedRows ?? 0) > 0 && (
+                          <span className="text-gray-400">
+                            {" "}
+                            · {f.repeatedRows} repeated in file
+                          </span>
                         )}
                       </div>
                     </div>
+                  )}
+                  {!f.error && (f.repeatedRows ?? 0) > 0 && (
+                    <details className="mt-2 text-xs text-gray-500">
+                      <summary className="cursor-pointer text-amber-700">
+                        Why are {f.repeatedRows} lines being skipped?
+                      </summary>
+                      <p className="mt-1.5 max-w-2xl">
+                        These lines appear more than once in this file with the same contractor,
+                        description, quantity and price. Each is stored once. Prices are not
+                        affected, because the pricing report counts a repeated price once anyway.
+                      </p>
+                      <ul className="mt-1.5 space-y-0.5 max-w-2xl">
+                        {(f.repeatedSamples ?? []).map((r, j) => (
+                          <li key={j} className="truncate">
+                            {r.contractor} · {r.originalDescription} · {r.qty} {r.unit} @ {r.price}
+                          </li>
+                        ))}
+                        {(f.repeatedRows ?? 0) > (f.repeatedSamples?.length ?? 0) && (
+                          <li>
+                            …and {(f.repeatedRows ?? 0) - (f.repeatedSamples?.length ?? 0)} more
+                          </li>
+                        )}
+                      </ul>
+                    </details>
                   )}
                 </div>
               ))}
@@ -312,8 +345,9 @@ export function IngestPanel() {
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Bid history updated</h2>
               <p className="text-sm text-gray-500">
-                {syncResult.inserted} rows inserted
-                {syncResult.duplicatesSkipped > 0 && `, ${syncResult.duplicatesSkipped} duplicates skipped`}
+                {syncResult.inserted} rows added to the bid history
+                {syncResult.duplicatesSkipped > 0 &&
+                  `; ${syncResult.duplicatesSkipped} more were skipped because identical rows were already stored`}
               </p>
             </div>
           </div>

@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       try {
         const buffer = await file.arrayBuffer();
         const { projectName, bidDate, rows } = parseBidTab(buffer);
-        const { newRows, duplicateRows, duplicateOfFiles } = await filterNewRows(
+        const { newRows, duplicateRows, repeatedRows, duplicateOfFiles } = await filterNewRows(
           file.name,
           projectName,
           rows,
@@ -33,6 +33,8 @@ export async function POST(req: NextRequest) {
           totalRows: rows.length,
           newRows: newRows.length,
           duplicateRows: duplicateRows.length,
+          repeatedRows: repeatedRows.length,
+          repeatedSamples: repeatedRows.slice(0, 10),
           duplicateOfFiles,
           rows: newRows,
         });

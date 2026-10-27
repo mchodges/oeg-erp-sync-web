@@ -86,6 +86,10 @@ export interface HarvestFileResult {
   totalRows: number;
   newRows: number;
   duplicateRows: number;
+  /** Lines repeated inside this file (same contractor, description, qty and price); kept once. */
+  repeatedRows?: number;
+  /** A few of the repeated lines, for the preview. */
+  repeatedSamples?: RawBidRow[];
   /** Other filenames (or this upload) that already contain some of this file's rows. */
   duplicateOfFiles?: string[];
   rows: RawBidRow[];
