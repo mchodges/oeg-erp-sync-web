@@ -38,8 +38,8 @@ export async function fetchMasterCatalog(): Promise<MasterCatalogRecord[]> {
 export function catalogAsOptions(catalog: MasterCatalogRecord[]): MasterCatalogOption[] {
   return catalog
     .filter((c) => c.masterItemName)
-    .map((c) => ({ id: c.id, name: c.masterItemName }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .map((c) => ({ id: c.id, name: c.masterItemName, unit: c.standardUnit, category: c.category }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 }
 
 export function catalogNameToId(catalog: MasterCatalogRecord[]): Map<string, string> {

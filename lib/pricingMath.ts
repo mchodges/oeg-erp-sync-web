@@ -1,7 +1,8 @@
-import type { MasterCatalogStat } from "@/types";
+import type { MasterCatalogStat, UnitMismatch } from "@/types";
 import type { BidHistoryRow } from "./supabase";
 import type { MasterCatalogRecord } from "./airtablePricing";
 import { normalizeDescription } from "./normalizeText";
+import { normalizeUnit, unitsConflict } from "./units";
 
 const REVIEW = "REVIEW";
 const OUTLIER_TRIM_PCT = 0.1;
@@ -60,6 +61,9 @@ export interface EstimateReport {
   reviewCount: number;
   /** Rows explicitly marked Ignored (no match exists) — will never resolve, not a backlog. */
   ignoredCount: number;
+  /** Priced rows left out because the bid's unit differs from the catalog item's unit. */
+  unitMismatchCount: number;
+  unitMismatches: UnitMismatch[];
 }
 
 /** Port of notebook Chunk 5: resolve → clean → dedupe → group → outlier-trim → stats → merge onto catalog. */
@@ -71,6 +75,9 @@ export function computeEstimateReport(
 ): EstimateReport {
   let reviewCount = 0;
   let ignoredCount = 0;
+  let unitMismatchCount = 0;
+  const catalogById = new Map(masterCatalog.map((c) => [c.id, c]));
+  const mismatchGroups = new Map<string, UnitMismatch>();
   const seenDupeKeys = new Set<string>();
   const groups = new Map<string, { price: number; qty: number }[]>();
 
@@ -96,6 +103,25 @@ export function computeEstimateReport(
     // damage deduct are listed at qty 0), so its price says nothing about unit cost. Skipped here,
     // after the review/ignored counting above, so those banner counts stay accurate.
     if (row.qty <= 0) continue;
+
+    // A price per LF and a price per EA are different scales, so averaging them together
+    // would skew the item. Rows whose unit disagrees with the catalog are left out and reported.
+    const catalogItem = catalogById.get(masterItem);
+    if (catalogItem && unitsConflict(row.unit, catalogItem.standardUnit)) {
+      unitMismatchCount++;
+      const groupKey = `${masterItem}|${normalizeUnit(row.unit)}`;
+      const group = mismatchGroups.get(groupKey);
+      if (group) group.rows++;
+      else {
+        mismatchGroups.set(groupKey, {
+          masterItem: catalogItem.masterItemName,
+          catalogUnit: catalogItem.standardUnit,
+          bidUnit: normalizeUnit(row.unit),
+          rows: 1,
+        });
+      }
+      continue;
+    }
 
     const dupeKey = `${row.projectName ?? ""}|${row.contractor}|${masterItem}|${row.price}`;
     if (seenDupeKeys.has(dupeKey)) continue;
@@ -128,5 +154,6 @@ export function computeEstimateReport(
     };
   });
 
-  return { report, reviewCount, ignoredCount };
+  const unitMismatches = [...mismatchGroups.values()].sort((a, b) => b.rows - a.rows);
+  return { report, reviewCount, ignoredCount, unitMismatchCount, unitMismatches };
 }

@@ -136,6 +136,9 @@ export interface LivingMatchRecord extends LivingMatchGuess {
 export interface MasterCatalogOption {
   id: string;
   name: string;
+  /** Standard_Unit of the catalog item (SY, LF, EA …), "" if unset. */
+  unit: string;
+  category: string;
 }
 
 export interface LivingMatchesResult {
@@ -158,10 +161,20 @@ export interface MasterCatalogStat {
   excludeFromStats: boolean;
 }
 
+/** Bid rows left out of an item's pricing because their unit disagrees with the catalog unit. */
+export interface UnitMismatch {
+  masterItem: string;
+  catalogUnit: string;
+  bidUnit: string;
+  rows: number;
+}
+
 export interface PricingEstimateResult {
   report: MasterCatalogStat[];
   reviewCount: number;
   ignoredCount: number;
+  unitMismatchCount: number;
+  unitMismatches: UnitMismatch[];
   today: string;
 }
 

@@ -205,6 +205,24 @@ export function EstimatePanel() {
             </div>
           )}
 
+          {estimate.unitMismatchCount > 0 && (
+            <details className="px-5 py-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800">
+              <summary className="cursor-pointer">
+                {estimate.unitMismatchCount.toLocaleString()} bid rows were left out of the
+                prices because their unit does not match the catalog item's unit (for example
+                priced per LF where the catalog item is per EA).
+              </summary>
+              <ul className="mt-2 space-y-0.5 text-xs">
+                {estimate.unitMismatches.map((m, i) => (
+                  <li key={i}>
+                    {m.masterItem}: bid in {m.bidUnit}, catalog is {m.catalogUnit} — {m.rows}{" "}
+                    {m.rows === 1 ? "row" : "rows"}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
           <Card className="overflow-hidden">
             <div className="px-6 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-700">Pricing report</h2>
