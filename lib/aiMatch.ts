@@ -23,6 +23,15 @@ export interface FewShotExample {
   masterItem: string;
 }
 
+/** A line the reviewer decided has no suitable catalog item. */
+export interface RejectedExample {
+  rawDescription: string;
+  rawUnit: string;
+}
+
+/** What the AI answers when no catalog item fits; stored as the guess and left unlinked. */
+export const NO_MATCH = "NO MATCH";
+
 export interface AiMatchGuess {
   rawDescription: string;
   rawUnit: string;
@@ -48,7 +57,7 @@ const RECORD_MATCHES_TOOL: Anthropic.Tool = {
             },
             ai_guessed_master_item: {
               type: "string",
-              description: "The best-matching Master_Item_Name from the catalog, verbatim.",
+              description: `The best-matching Master_Item_Name from the catalog, verbatim, or the literal text ${NO_MATCH} when no catalog item fits.`,
             },
             confidence: { type: "string", enum: ["High", "Medium", "Low"] },
           },
@@ -140,6 +149,7 @@ export async function matchBatch(
   items: UnmatchedItem[],
   catalog: MasterCatalogRecord[],
   fewShot: FewShotExample[],
+  rejected: RejectedExample[] = [],
 ): Promise<AiMatchGuess[]> {
   if (items.length === 0) return [];
 
@@ -159,13 +169,25 @@ export async function matchBatch(
       )
     : "(none yet)";
 
+  const rejectedText = rejected.length
+    ? JSON.stringify(
+        rejected.map((r) => ({ Raw_Description: r.rawDescription.slice(0, 240), Raw_Unit: r.rawUnit })),
+        null,
+        2,
+      )
+    : "(none yet)";
+
   const prompt = `You are an expert civil engineering estimator. Map these RAW DESCRIPTIONS to the appropriate MASTER ITEM.
 
 GUIDELINES:
 1. SIZE MATTERS: Match the exact pipe/item size and spec (e.g. 6-inch vs 8-inch). Do not guess a size that isn't stated.
 2. UNIT STANDARDIZATION: Convert raw units into standard codes: SY, LF, EA, TON, AC, LS, CY.
-3. PAST TRAINING (FEW-SHOT): Study these verified examples to understand our mapping style:
+3. UNITS MUST AGREE: Prefer a catalog item whose Standard_Unit equals the line's unit. If the only plausible item is priced in a different unit, set confidence to Low.
+4. NO MATCH: If no catalog item has the same kind of item and size/spec (for example a box culvert size the catalog does not carry), answer ${NO_MATCH} with confidence Low. Do not pick a merely "close" size. A line that resembles the NO-MATCH examples below is also ${NO_MATCH}.
+5. PAST TRAINING: These verified examples were chosen because they look like the new items. Follow the mapping they show, including for similar pipe materials and specs:
 ${fewShotText}
+6. NO-MATCH EXAMPLES: Reviewers decided these lines have no suitable catalog item:
+${rejectedText}
 
 MASTER CATALOG (Master_Item_Name | Standard_Unit):
 ${catalogText}

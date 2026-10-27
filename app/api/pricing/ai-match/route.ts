@@ -3,22 +3,17 @@ import { createRecords } from "@/lib/airtable";
 import {
   catalogIdToName,
   catalogNameToId,
-  fetchKnownRawDescriptions,
+  fetchAllLivingMatches,
   fetchMasterCatalog,
-  fetchVerifiedLivingMatches,
   LIVING_MATCHES_TABLE,
   PRICING_BASE_ID,
 } from "@/lib/airtablePricing";
-import { matchBatch, type FewShotExample } from "@/lib/aiMatch";
+import { matchBatch } from "@/lib/aiMatch";
+import { selectExamples } from "@/lib/matchExamples";
 import { normalizeDescription } from "@/lib/normalizeText";
 import type { LivingMatchGuess, UnmatchedItem } from "@/types";
 
 export const maxDuration = 60;
-
-function sampleFewShot(verified: FewShotExample[], n: number): FewShotExample[] {
-  const shuffled = [...verified].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, n);
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,11 +22,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No items provided." }, { status: 400 });
     }
 
-    const [catalog, verified, known] = await Promise.all([
-      fetchMasterCatalog(),
-      fetchVerifiedLivingMatches(),
-      fetchKnownRawDescriptions(),
-    ]);
+    const [catalog, allMatches] = await Promise.all([fetchMasterCatalog(), fetchAllLivingMatches()]);
+    const known = new Set(allMatches.map((r) => normalizeDescription(r.rawDescription)).filter(Boolean));
 
     // Guard against double scans (two tabs, a retried batch): never create a second
     // Living_Matches row for a description that already has one in any status.
@@ -43,18 +35,22 @@ export async function POST(req: NextRequest) {
     const idToName = catalogIdToName(catalog);
     const nameToId = catalogNameToId(catalog);
 
-    const fewShot = sampleFewShot(
-      verified
-        .map((v) => ({
-          rawDescription: v.rawDescription,
-          rawUnit: v.rawUnit,
-          masterItem: idToName.get(v.masterItemId) ?? "",
-        }))
-        .filter((f) => f.masterItem),
-      20,
-    );
+    // Every past reviewer decision is available to the AI: approved matches teach it which item a
+    // kind of line belongs to, and "no match" decisions teach it which lines the catalog lacks.
+    const verified = allMatches
+      .filter((r) => r.status === "Verified")
+      .map((v) => ({
+        rawDescription: v.rawDescription,
+        rawUnit: v.rawUnit,
+        masterItem: idToName.get(v.masterItemId) ?? "",
+      }))
+      .filter((f) => f.masterItem && f.rawDescription);
+    const rejected = allMatches
+      .filter((r) => r.status === "Ignored" && r.rawDescription)
+      .map((r) => ({ rawDescription: r.rawDescription, rawUnit: r.rawUnit }));
 
-    const guesses = await matchBatch(items, catalog, fewShot);
+    const examples = selectExamples(items, verified, rejected);
+    const guesses = await matchBatch(items, catalog, examples.fewShot, examples.rejected);
 
     // Master_Item is a Link field to Master_Catalog — only set it when the AI's
     // guess exactly matches a real catalog item; otherwise leave it unlinked so
