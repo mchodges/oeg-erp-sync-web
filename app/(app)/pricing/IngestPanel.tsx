@@ -169,7 +169,7 @@ export function IngestPanel() {
   }, []);
 
   return (
-    <div className="space-y-5">
+    <div className={`space-y-5 ${appState === "review" ? "" : "max-w-5xl"}`}>
       {appState === "idle" && (
         <>
           <div

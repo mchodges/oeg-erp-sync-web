@@ -211,7 +211,7 @@ export function ReviewTable({ records, masterItems, onReviewed, onCatalogItemAdd
     return (
       <th
         onClick={() => toggleSort(key)}
-        className={`${className} font-medium cursor-pointer select-none hover:text-gray-700`}
+        className={`${className} font-medium whitespace-nowrap cursor-pointer select-none hover:text-gray-700`}
       >
         {label}
         <span className={`ml-1 inline-block w-3 ${active ? "text-gray-600" : "text-gray-300"}`}>
@@ -305,7 +305,7 @@ export function ReviewTable({ records, masterItems, onReviewed, onCatalogItemAdd
               {header("Unit", "rawUnit")}
               {header("Confidence", "confidence")}
               {header("Master Item", "masterItem")}
-              <th className="px-4 py-3 font-medium text-right">Actions</th>
+              <th className="px-4 py-3 font-medium text-right whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -321,7 +321,9 @@ export function ReviewTable({ records, masterItems, onReviewed, onCatalogItemAdd
               const aiNoMatch = isNoMatch(r.aiGuess);
               return (
                 <tr key={r.recordId} className="hover:bg-gray-50 transition-colors">
-                  <td className="pl-5 pr-2 py-3 align-top">
+                  {/* Every cell is top-aligned; the text cells get extra top padding so their first line
+                      sits level with the middle of the picker and the buttons. */}
+                  <td className="pl-5 pr-2 pt-[19px] pb-3 align-top">
                     <input
                       type="checkbox"
                       checked={selected.has(r.recordId)}
@@ -330,14 +332,16 @@ export function ReviewTable({ records, masterItems, onReviewed, onCatalogItemAdd
                       aria-label="Select this line"
                     />
                   </td>
-                  <td className="px-3 py-3 text-gray-900 max-w-md whitespace-normal break-words">
+                  <td className="px-3 pt-[17px] pb-3 align-top text-gray-900 max-w-2xl whitespace-normal break-words">
                     {r.rawDescription}
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{r.rawUnit}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="px-4 pt-[17px] pb-3 align-top text-xs leading-5 text-gray-500 whitespace-nowrap">
+                    {r.rawUnit}
+                  </td>
+                  <td className="px-4 pt-[17px] pb-3 align-top whitespace-nowrap">
                     <ConfidenceBadge confidence={r.confidence} />
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 align-top">
                     <MasterItemPicker
                       items={masterItems}
                       value={choiceFor(r)}
@@ -353,13 +357,13 @@ export function ReviewTable({ records, masterItems, onReviewed, onCatalogItemAdd
                       </p>
                     )}
                     {mismatch && (
-                      <p className="mt-1 text-[11px] text-amber-700 max-w-[240px]">
+                      <p className="mt-1 text-[11px] text-amber-700 max-w-[340px]">
                         ⚠ This line is priced per {r.rawUnit}; “{mismatch.name}” is per {mismatch.unit}.
                         Its prices will be left out of the report.
                       </p>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap align-top">
+                  <td className="px-4 py-3 align-top text-right whitespace-nowrap">
                     <button
                       onClick={() => review(r.recordId, "approve", choiceFor(r))}
                       disabled={pending[r.recordId] || !choiceFor(r)}

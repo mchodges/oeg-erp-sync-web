@@ -40,7 +40,7 @@ function matchesSearch(item: MasterCatalogOption, tokens: string[]): boolean {
 }
 
 const PANEL_WIDTH = 440;
-const PANEL_MAX_HEIGHT = 360;
+const PANEL_MAX_HEIGHT = 440;
 
 interface Props {
   items: MasterCatalogOption[];
@@ -158,7 +158,7 @@ export function MasterItemPicker({ items, value, onChange, disabled, rowUnit, su
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="flex items-center justify-between gap-2 w-[240px] text-left text-xs bg-white border border-gray-300
+        className="flex items-center justify-between gap-2 w-[340px] text-left text-xs bg-white border border-gray-300
           rounded-md px-2 py-1.5 hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
           disabled:opacity-50"
       >
@@ -191,7 +191,13 @@ export function MasterItemPicker({ items, value, onChange, disabled, rowUnit, su
               {flat.length === 0 && <p className="px-3 py-4 text-xs text-gray-400">No catalog items match “{query}”.</p>}
               {visible.map((g) => (
                 <div key={g.key}>
-                  <div className="sticky top-0 bg-gray-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                  <div
+                    className={`sticky top-0 z-[1] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide border-y ${
+                      g.key === SUGGESTED
+                        ? "bg-indigo-600 border-indigo-600 text-white"
+                        : "bg-slate-200 border-slate-300 text-slate-800"
+                    }`}
+                  >
                     {g.label}
                   </div>
                   {g.items.map((item) => {
@@ -206,15 +212,14 @@ export function MasterItemPicker({ items, value, onChange, disabled, rowUnit, su
                         data-index={i}
                         onMouseEnter={() => setActive(i)}
                         onClick={() => choose(item.id)}
-                        className={`flex items-center justify-between gap-3 px-3 py-1.5 text-xs cursor-pointer
+                        className={`flex items-center justify-between gap-3 pl-6 pr-3 py-1.5 text-xs cursor-pointer
                           ${i === active ? "bg-indigo-50" : ""} ${item.id === value ? "font-semibold" : ""}`}
                       >
-                        <span className="text-gray-900">{item.name}</span>
+                        <span className={conflict ? "text-gray-500" : "text-gray-700"}>{item.name}</span>
                         <span
                           title={conflict ? `This line is priced per ${rowUnit}, the catalog item is per ${item.unit}` : undefined}
-                          className={`shrink-0 ${conflict ? "text-amber-600 font-semibold" : "text-gray-400"}`}
+                          className={`shrink-0 ${conflict ? "text-amber-600 font-medium" : "text-gray-400"}`}
                         >
-                          {conflict && "⚠ "}
                           {item.unit}
                         </span>
                       </div>

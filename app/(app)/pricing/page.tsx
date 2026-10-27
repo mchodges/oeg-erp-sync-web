@@ -24,13 +24,19 @@ export default function PricingPage() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <div className="max-w-5xl mx-auto px-4 py-8 space-y-5">
+      <div className="max-w-[1800px] mx-auto px-6 py-8 space-y-5">
         <div className="flex items-center gap-2">
           {tab("ingest", "Ingest")}
           {tab("estimate", "Estimate")}
         </div>
 
-        {mode === "ingest" ? <IngestPanel /> : <EstimatePanel />}
+        {mode === "ingest" ? (
+          <IngestPanel />
+        ) : (
+          <div className="max-w-5xl">
+            <EstimatePanel />
+          </div>
+        )}
       </div>
     </main>
   );
