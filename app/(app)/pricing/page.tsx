@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { IngestPanel } from "./IngestPanel";
 import { EstimatePanel } from "./EstimatePanel";
+import { TrendsPanel } from "./TrendsPanel";
 
-type Mode = "ingest" | "estimate";
+type Mode = "ingest" | "estimate" | "trends";
 
 export default function PricingPage() {
   const [mode, setMode] = useState<Mode>("ingest");
@@ -28,10 +29,15 @@ export default function PricingPage() {
         <div className="flex items-center gap-2">
           {tab("ingest", "Ingest")}
           {tab("estimate", "Estimate")}
+          {tab("trends", "Trends")}
         </div>
 
         {mode === "ingest" ? (
           <IngestPanel />
+        ) : mode === "trends" ? (
+          <div className="max-w-6xl">
+            <TrendsPanel />
+          </div>
         ) : (
           <div className="max-w-5xl">
             <EstimatePanel />
