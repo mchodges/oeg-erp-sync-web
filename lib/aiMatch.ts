@@ -184,9 +184,10 @@ GUIDELINES:
 2. UNIT STANDARDIZATION: Convert raw units into standard codes: SY, LF, EA, TON, AC, LS, CY.
 3. UNITS MUST AGREE: Prefer a catalog item whose Standard_Unit equals the line's unit. If the only plausible item is priced in a different unit, set confidence to Low.
 4. NO MATCH: If no catalog item has the same kind of item and size/spec (for example a box culvert size the catalog does not carry), answer ${NO_MATCH} with confidence Low. Do not pick a merely "close" size. A line that resembles the NO-MATCH examples below is also ${NO_MATCH}.
-5. PAST TRAINING: These verified examples were chosen because they look like the new items. Follow the mapping they show, including for similar pipe materials and specs:
+5. EARTHWORK SCOPE: For detention/amenity basin, pond and lake earthwork, match on WHAT THE LINE INCLUDES, not on where it is dug. A line that excavates AND hauls, places or compacts the material (for example "includes hauling… placement and compaction", or "on-site disposal… contractor to haul, place, grade and compact") is the all-in item. A line that only excavates or grades, with no hauling or placement mentioned, is the "Excavation Only" item. A line that only hauls, spreads, places or compacts material excavated elsewhere ("haul, spread and compact excavated material…", fill-area placement, embankment) is the "Haul, Spread and Compact Only" item. Off-site disposal lines go to an off-site item. Clay liner, clay slope protection, mixing, demucking and over-excavation lines never go to these basin excavation items. Detention and amenity basins are not separate items.
+6. PAST TRAINING: These verified examples were chosen because they look like the new items. Follow the mapping they show, including for similar pipe materials and specs. If an example conflicts with the earthwork scope rule above, follow the scope rule:
 ${fewShotText}
-6. NO-MATCH EXAMPLES: Reviewers decided these lines have no suitable catalog item:
+7. NO-MATCH EXAMPLES: Reviewers decided these lines have no suitable catalog item:
 ${rejectedText}
 
 MASTER CATALOG (Master_Item_Name | Standard_Unit):

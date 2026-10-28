@@ -3,6 +3,7 @@ import { buildDictionaryMap, fetchMasterCatalog, type MasterCatalogRecord } from
 import { normalizeDescription } from "./normalizeText";
 import { unitsConflict } from "./units";
 import { BENCHMARKS } from "./benchmarks";
+import { combineSplitBids, type AcceptedLine } from "./combineBids";
 import { parseBidDate, type TrendData, type TrendItem } from "./priceTrend";
 
 /**
@@ -20,6 +21,7 @@ export function buildTrendData(
   const projectIndex = new Map<string, number>();
   const projects: string[] = [];
   const seen = new Set<string>();
+  const accepted: AcceptedLine[] = [];
   const skipped = { undated: 0, unitMismatch: 0 };
   let lastDate: string | null = null;
 
@@ -62,6 +64,19 @@ export function buildTrendData(
       items.set(item.id, entry);
     }
     entry.bids.push({ date, price: row.price, project, contractor: row.contractor });
+    accepted.push({ projectName, contractor: row.contractor, itemId: item.id, price: row.price, qty: row.qty, date });
+  }
+
+  // Split bids (excavate line + haul/place line) become one all-in bid for the all-in item.
+  for (const line of combineSplitBids(accepted, catalog)) {
+    const target = catalogById.get(line.itemId);
+    if (!target || !line.date) continue;
+    let entry = items.get(target.id);
+    if (!entry) {
+      entry = { id: target.id, name: target.masterItemName, unit: target.standardUnit, category: target.category, bids: [] };
+      items.set(target.id, entry);
+    }
+    entry.bids.push({ date: line.date, price: line.price, project: projectIndex.get(line.projectName) ?? 0, contractor: line.contractor });
   }
 
   const idByName = new Map(catalog.map((c) => [normalizeDescription(c.masterItemName), c.id]));

@@ -159,6 +159,8 @@ export interface MasterCatalogStat {
   /** True for allowance/contingency-type items (e.g. Ductile Iron Fittings) where bid
    * unit prices are nominal placeholders, not real market pricing — stats are withheld. */
   excludeFromStats: boolean;
+  /** How many of `count` are all-in samples built by adding a contractor's split lines (excavate + haul/place). */
+  combinedCount: number;
 }
 
 /** Bid rows left out of an item's pricing because their unit disagrees with the catalog unit. */

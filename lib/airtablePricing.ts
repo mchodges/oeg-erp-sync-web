@@ -18,12 +18,14 @@ export interface MasterCatalogRecord {
   standardUnit: string;
   category: string;
   excludeFromStats: boolean;
+  /** Master_Catalog record id of the all-in item this item is one part of, or "" (see combineBids.ts). */
+  combinesInto: string;
 }
 
 export async function fetchMasterCatalog(): Promise<MasterCatalogRecord[]> {
   const records = await fetchAllRecords(
     MASTER_CATALOG_TABLE(),
-    { fields: ["Master_Item_Name", "Standard_Unit", "Category", "Exclude_From_Stats"] },
+    { fields: ["Master_Item_Name", "Standard_Unit", "Category", "Exclude_From_Stats", "Combines_Into"] },
     PRICING_BASE_ID(),
   );
   return records.map((r) => ({
@@ -32,6 +34,7 @@ export async function fetchMasterCatalog(): Promise<MasterCatalogRecord[]> {
     standardUnit: String(r.fields.Standard_Unit ?? "").trim(),
     category: String(r.fields.Category ?? "").trim(),
     excludeFromStats: Boolean(r.fields.Exclude_From_Stats),
+    combinesInto: normalizeLinkedIds(r.fields.Combines_Into)[0] ?? "",
   }));
 }
 

@@ -1,6 +1,7 @@
 import type { MasterCatalogStat, UnitMismatch } from "@/types";
 import type { BidHistoryRow } from "./supabase";
 import type { MasterCatalogRecord } from "./airtablePricing";
+import { combineSplitBids, type AcceptedLine } from "./combineBids";
 import { normalizeDescription } from "./normalizeText";
 import { normalizeUnit, unitsConflict } from "./units";
 
@@ -80,6 +81,7 @@ export function computeEstimateReport(
   const mismatchGroups = new Map<string, UnitMismatch>();
   const seenDupeKeys = new Set<string>();
   const groups = new Map<string, { price: number; qty: number }[]>();
+  const accepted: AcceptedLine[] = [];
 
   // The dedupe below keeps the first line seen per project+contractor+item+price, so the
   // order must be fixed: oldest ingested row (lowest id) wins, the same on every run.
@@ -131,6 +133,23 @@ export function computeEstimateReport(
     const pair = { price: row.price, qty: row.qty };
     if (group) group.push(pair);
     else groups.set(masterItem, [pair]);
+    accepted.push({
+      projectName: row.projectName ?? "",
+      contractor: row.contractor,
+      itemId: masterItem,
+      price: row.price,
+      qty: row.qty,
+    });
+  }
+
+  // Split bids (excavate line + haul/place line) become one all-in sample for the all-in item.
+  const combinedCounts = new Map<string, number>();
+  for (const line of combineSplitBids(accepted, masterCatalog)) {
+    const pair = { price: line.price, qty: line.qty };
+    const group = groups.get(line.itemId);
+    if (group) group.push(pair);
+    else groups.set(line.itemId, [pair]);
+    combinedCounts.set(line.itemId, (combinedCounts.get(line.itemId) ?? 0) + 1);
   }
 
   const calcResults = new Map<string, StatRow>();
@@ -151,6 +170,7 @@ export function computeEstimateReport(
       low: item.excludeFromStats ? null : stats?.low ?? null,
       high: item.excludeFromStats ? null : stats?.high ?? null,
       excludeFromStats: item.excludeFromStats,
+      combinedCount: combinedCounts.get(item.id) ?? 0,
     };
   });
 

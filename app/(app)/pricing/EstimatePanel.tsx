@@ -54,7 +54,12 @@ function toCsv(report: MasterCatalogStat[]): string {
     r.median ?? "",
     r.low ?? "",
     r.high ?? "",
-    r.excludeFromStats ? "Allowance/contingency item — excluded from pricing stats" : "",
+    [
+      r.excludeFromStats ? "Allowance/contingency item — excluded from pricing stats" : "",
+      r.combinedCount > 0 ? `${r.combinedCount} of ${r.count} samples combine a contractor's excavate and haul/place lines` : "",
+    ]
+      .filter(Boolean)
+      .join("; "),
   ]);
   return [header, ...rows]
     .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
@@ -261,7 +266,17 @@ export function EstimatePanel() {
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500">{r.category}</td>
                       <td className="px-4 py-3 text-xs text-gray-500">{r.standardUnit}</td>
-                      <td className="px-4 py-3 text-right font-mono text-xs text-gray-600">{r.count}</td>
+                      <td className="px-4 py-3 text-right font-mono text-xs text-gray-600">
+                        {r.count}
+                        {r.combinedCount > 0 && (
+                          <span
+                            className="block text-[10px] font-sans text-gray-400"
+                            title="Samples built by adding one contractor's excavate line and haul/place line on one project"
+                          >
+                            {r.combinedCount} combined
+                          </span>
+                        )}
+                      </td>
                       {r.excludeFromStats ? (
                         <td colSpan={4} className="px-4 py-3 text-center text-xs text-amber-700">
                           Not priced — excluded from stats
