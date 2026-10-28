@@ -199,7 +199,7 @@ Call record_matches with one entry per new item, in the same order given.`;
 
   const response = await anthropic().messages.create({
     model: MODEL,
-    max_tokens: 4096,
+    max_tokens: 8192,
     temperature: 0.1,
     tools: [RECORD_MATCHES_TOOL],
     tool_choice: { type: "tool", name: "record_matches" },
@@ -209,16 +209,31 @@ Call record_matches with one entry per new item, in the same order given.`;
   const toolUse = response.content.find(
     (block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
   );
-  if (!toolUse) throw new Error("Claude did not return a record_matches tool call.");
+  const input = toolUse?.input as
+    | {
+        matches?: {
+          raw_description: string;
+          raw_unit: string;
+          ai_guessed_master_item: string;
+          confidence: string;
+        }[];
+      }
+    | undefined;
 
-  const input = toolUse.input as {
-    matches: {
-      raw_description: string;
-      raw_unit: string;
-      ai_guessed_master_item: string;
-      confidence: string;
-    }[];
-  };
+  // A batch whose answer was cut off (too much to write out) or came back without its list comes
+  // back unusable. Retry it as two smaller batches; a single line that still fails is left out,
+  // and shows up as unmatched on the next scan.
+  if (!Array.isArray(input?.matches) || response.stop_reason === "max_tokens") {
+    if (items.length === 1) {
+      console.error("[aiMatch] no usable answer for:", items[0].description.slice(0, 120));
+      return [];
+    }
+    const mid = Math.ceil(items.length / 2);
+    const first = await matchBatch(items.slice(0, mid), catalog, fewShot, rejected);
+    const second = await matchBatch(items.slice(mid), catalog, fewShot, rejected);
+    return [...first, ...second];
+  }
+  const matches = input.matches;
 
   // Claude re-types the description it echoes (curly quotes come back straight),
   // so never store its copy: pair each guess with the input item it belongs to and
@@ -226,13 +241,13 @@ Call record_matches with one entry per new item, in the same order given.`;
   const used = new Set<number>();
   return items.flatMap((item, i) => {
     const key = normalizeDescription(item.description);
-    let idx = input.matches.findIndex(
+    let idx = matches.findIndex(
       (m, j) => !used.has(j) && normalizeDescription(m.raw_description) === key,
     );
-    if (idx === -1 && input.matches.length === items.length && !used.has(i)) idx = i;
+    if (idx === -1 && matches.length === items.length && !used.has(i)) idx = i;
     if (idx === -1) return [];
     used.add(idx);
-    const m = input.matches[idx];
+    const m = matches[idx];
     return [
       {
         rawDescription: item.description,
