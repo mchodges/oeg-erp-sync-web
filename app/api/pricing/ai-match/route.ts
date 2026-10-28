@@ -5,6 +5,7 @@ import {
   catalogNameToId,
   fetchAllLivingMatches,
   fetchMasterCatalog,
+  fetchMatchingRules,
   LIVING_MATCHES_TABLE,
   PRICING_BASE_ID,
 } from "@/lib/airtablePricing";
@@ -24,7 +25,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No items provided." }, { status: 400 });
     }
 
-    const [catalog, allMatches] = await Promise.all([fetchMasterCatalog(), fetchAllLivingMatches()]);
+    const [catalog, allMatches, rules] = await Promise.all([
+      fetchMasterCatalog(),
+      fetchAllLivingMatches(),
+      fetchMatchingRules(),
+    ]);
     const known = new Set(allMatches.map((r) => normalizeDescription(r.rawDescription)).filter(Boolean));
 
     // Guard against double scans (two tabs, a retried batch): never create a second
@@ -52,7 +57,7 @@ export async function POST(req: NextRequest) {
       .map((r) => ({ rawDescription: r.rawDescription, rawUnit: r.rawUnit }));
 
     const examples = selectExamples(items, verified, rejected);
-    const guesses = await matchBatch(items, catalog, examples.fewShot, examples.rejected);
+    const guesses = await matchBatch(items, catalog, examples.fewShot, examples.rejected, rules);
 
     // Only lines a person approved can vouch for a new one. Auto-approved lines never do, so one
     // automatic decision can't pave the way for the next and slowly drift away from what was reviewed.

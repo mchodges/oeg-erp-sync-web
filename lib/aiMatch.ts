@@ -144,18 +144,33 @@ Call propose_catalog_item.`;
   };
 }
 
-/** Batch-matches new raw line-item descriptions to Master Catalog items via Claude (notebook Chunk 6, adapted). */
+/** The catalog as the AI sees it: one "name | unit" line per item, with the item's Match_Notes indented beneath. */
+export function formatCatalogForPrompt(catalog: MasterCatalogRecord[]): string {
+  return catalog
+    .map((c) => {
+      const notes = c.matchNotes.replace(/\s+/g, " ").trim().slice(0, 700);
+      return `${c.masterItemName} | ${c.standardUnit}${notes ? `\n    NOTES: ${notes}` : ""}`;
+    })
+    .join("\n");
+}
+
+/** Built-in earthwork guidance, used only until the same guidance is kept in the Matching_Rules table. */
+const EARTHWORK_FALLBACK = `5. EARTHWORK SCOPE: For detention/amenity basin, pond and lake earthwork, match on WHAT THE LINE INCLUDES, not on where it is dug. A line that excavates AND hauls, places or compacts the material (for example "includes hauling… placement and compaction", or "on-site disposal… contractor to haul, place, grade and compact") is the all-in item. A line that only excavates or grades, with no hauling or placement mentioned, is the "Excavation Only" item. A line that only hauls, spreads, places or compacts material excavated elsewhere ("haul, spread and compact excavated material…", fill-area placement, embankment) is the "Haul, Spread and Compact Only" item. Off-site disposal lines go to an off-site item. Clay liner, clay slope protection, mixing, demucking and over-excavation lines never go to these basin excavation items. Detention and amenity basins are not separate items.`;
+
+/**
+ * Batch-matches new raw line-item descriptions to Master Catalog items via Claude (notebook Chunk 6, adapted).
+ * `rules` is the estimator's rulebook from the Matching_Rules table; per-item notes ride along in the catalog.
+ */
 export async function matchBatch(
   items: UnmatchedItem[],
   catalog: MasterCatalogRecord[],
   fewShot: FewShotExample[],
   rejected: RejectedExample[] = [],
+  rules = "",
 ): Promise<AiMatchGuess[]> {
   if (items.length === 0) return [];
 
-  const catalogText = catalog
-    .map((c) => `${c.masterItemName} | ${c.standardUnit}`)
-    .join("\n");
+  const catalogText = formatCatalogForPrompt(catalog);
 
   const fewShotText = fewShot.length
     ? JSON.stringify(
@@ -184,13 +199,13 @@ GUIDELINES:
 2. UNIT STANDARDIZATION: Convert raw units into standard codes: SY, LF, EA, TON, AC, LS, CY.
 3. UNITS MUST AGREE: Prefer a catalog item whose Standard_Unit equals the line's unit. If the only plausible item is priced in a different unit, set confidence to Low.
 4. NO MATCH: If no catalog item has the same kind of item and size/spec (for example a box culvert size the catalog does not carry), answer ${NO_MATCH} with confidence Low. Do not pick a merely "close" size. A line that resembles the NO-MATCH examples below is also ${NO_MATCH}.
-5. EARTHWORK SCOPE: For detention/amenity basin, pond and lake earthwork, match on WHAT THE LINE INCLUDES, not on where it is dug. A line that excavates AND hauls, places or compacts the material (for example "includes hauling… placement and compaction", or "on-site disposal… contractor to haul, place, grade and compact") is the all-in item. A line that only excavates or grades, with no hauling or placement mentioned, is the "Excavation Only" item. A line that only hauls, spreads, places or compacts material excavated elsewhere ("haul, spread and compact excavated material…", fill-area placement, embankment) is the "Haul, Spread and Compact Only" item. Off-site disposal lines go to an off-site item. Clay liner, clay slope protection, mixing, demucking and over-excavation lines never go to these basin excavation items. Detention and amenity basins are not separate items.
-6. PAST TRAINING: These verified examples were chosen because they look like the new items. Follow the mapping they show, including for similar pipe materials and specs. If an example conflicts with the earthwork scope rule above, follow the scope rule:
+${rules ? `5. RULEBOOK: Follow the ESTIMATOR'S RULEBOOK below and the NOTES printed under catalog items. They come from the estimating team and take priority over these general guidelines and over the examples.` : EARTHWORK_FALLBACK}
+6. PAST TRAINING: These verified examples were chosen because they look like the new items. Follow the mapping they show, including for similar pipe materials and specs. If an example conflicts with the rulebook or an item's NOTES, follow the rulebook or NOTES:
 ${fewShotText}
 7. NO-MATCH EXAMPLES: Reviewers decided these lines have no suitable catalog item:
 ${rejectedText}
-
-MASTER CATALOG (Master_Item_Name | Standard_Unit):
+${rules ? `\nESTIMATOR'S RULEBOOK:\n${rules}\n` : ""}
+MASTER CATALOG (Master_Item_Name | Standard_Unit; NOTES say what belongs in an item):
 ${catalogText}
 
 NEW ITEMS TO MAP:
@@ -230,8 +245,8 @@ Call record_matches with one entry per new item, in the same order given.`;
       return [];
     }
     const mid = Math.ceil(items.length / 2);
-    const first = await matchBatch(items.slice(0, mid), catalog, fewShot, rejected);
-    const second = await matchBatch(items.slice(mid), catalog, fewShot, rejected);
+    const first = await matchBatch(items.slice(0, mid), catalog, fewShot, rejected, rules);
+    const second = await matchBatch(items.slice(mid), catalog, fewShot, rejected, rules);
     return [...first, ...second];
   }
   const matches = input.matches;

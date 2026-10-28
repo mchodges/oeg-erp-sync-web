@@ -20,12 +20,14 @@ export interface MasterCatalogRecord {
   excludeFromStats: boolean;
   /** Master_Catalog record id of the all-in item this item is one part of, or "" (see combineBids.ts). */
   combinesInto: string;
+  /** What belongs in this item and what does not, written for the AI matcher (Master_Catalog.Match_Notes). */
+  matchNotes: string;
 }
 
 export async function fetchMasterCatalog(): Promise<MasterCatalogRecord[]> {
   const records = await fetchAllRecords(
     MASTER_CATALOG_TABLE(),
-    { fields: ["Master_Item_Name", "Standard_Unit", "Category", "Exclude_From_Stats", "Combines_Into"] },
+    { fields: ["Master_Item_Name", "Standard_Unit", "Category", "Exclude_From_Stats", "Combines_Into", "Match_Notes"] },
     PRICING_BASE_ID(),
   );
   return records.map((r) => ({
@@ -35,7 +37,35 @@ export async function fetchMasterCatalog(): Promise<MasterCatalogRecord[]> {
     category: String(r.fields.Category ?? "").trim(),
     excludeFromStats: Boolean(r.fields.Exclude_From_Stats),
     combinesInto: normalizeLinkedIds(r.fields.Combines_Into)[0] ?? "",
+    matchNotes: String(r.fields.Match_Notes ?? "").trim(),
   }));
+}
+
+/** The Matching_Rules table: general instructions for the AI matcher, edited in Airtable without a deploy. */
+const MATCHING_RULES_TABLE = () => process.env.MATCHING_RULES_TABLE_ID ?? "tblj0iUlOtRYMuGVV";
+
+/**
+ * The active rows of Matching_Rules joined into one text block, in Name order. Matching still works
+ * without it, so a missing table or a failed read yields "" instead of stopping the scan.
+ */
+export async function fetchMatchingRules(): Promise<string> {
+  try {
+    const records = await fetchAllRecords(
+      MATCHING_RULES_TABLE(),
+      { fields: ["Name", "Rules", "Active"] },
+      PRICING_BASE_ID(),
+    );
+    return records
+      .filter((r) => Boolean(r.fields.Active) && String(r.fields.Rules ?? "").trim())
+      .sort((a, b) =>
+        String(a.fields.Name ?? "").localeCompare(String(b.fields.Name ?? ""), undefined, { numeric: true }),
+      )
+      .map((r) => `## ${String(r.fields.Name ?? "").trim()}\n${String(r.fields.Rules).trim()}`)
+      .join("\n\n");
+  } catch (e) {
+    console.error("[matching-rules]", e instanceof Error ? e.message : String(e));
+    return "";
+  }
 }
 
 export function catalogAsOptions(catalog: MasterCatalogRecord[]): MasterCatalogOption[] {
