@@ -8,6 +8,8 @@ const ALIASES: Record<string, string> = {
   CUYD: "CY",
   CYD: "CY",
   EACH: "EA",
+  LOT: "EA",
+  LOTS: "EA",
   LUMPSUM: "LS",
   ACRE: "AC",
   ACRES: "AC",
