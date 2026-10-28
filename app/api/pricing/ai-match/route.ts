@@ -10,7 +10,9 @@ import {
 } from "@/lib/airtablePricing";
 import { matchBatch } from "@/lib/aiMatch";
 import { selectExamples } from "@/lib/matchExamples";
+import { findApprovedTwin, indexApproved } from "@/lib/nearDuplicate";
 import { normalizeDescription } from "@/lib/normalizeText";
+import { unitsConflict } from "@/lib/units";
 import type { LivingMatchGuess, UnmatchedItem } from "@/types";
 
 export const maxDuration = 60;
@@ -38,7 +40,7 @@ export async function POST(req: NextRequest) {
     // Every past reviewer decision is available to the AI: approved matches teach it which item a
     // kind of line belongs to, and "no match" decisions teach it which lines the catalog lacks.
     const verified = allMatches
-      .filter((r) => r.status === "Verified")
+      .filter((r) => r.status === "Verified" && !r.autoApproved)
       .map((v) => ({
         rawDescription: v.rawDescription,
         rawUnit: v.rawUnit,
@@ -52,13 +54,34 @@ export async function POST(req: NextRequest) {
     const examples = selectExamples(items, verified, rejected);
     const guesses = await matchBatch(items, catalog, examples.fewShot, examples.rejected);
 
+    // Only lines a person approved can vouch for a new one. Auto-approved lines never do, so one
+    // automatic decision can't pave the way for the next and slowly drift away from what was reviewed.
+    const approvedByPerson = indexApproved(
+      allMatches
+        .filter((r) => r.status === "Verified" && !r.autoApproved && r.rawDescription && r.masterItemId)
+        .map((r) => ({ rawDescription: r.rawDescription, masterItemId: r.masterItemId })),
+    );
+    const catalogById = new Map(catalog.map((c) => [c.id, c]));
+
+    // A line is approved without a person only when ALL of these hold: the AI is highly confident,
+    // it picked a real catalog item, that item's unit agrees with the line's unit, and a person-approved
+    // description is nearly word-for-word identical and went to that same item.
+    const decisions = guesses.map((g) => {
+      const matchedId = nameToId.get(g.aiGuess);
+      if (g.confidence !== "High" || !matchedId) return { matchedId, twin: null };
+      const unit = catalogById.get(matchedId)?.standardUnit;
+      if (unitsConflict(g.rawUnit, unit)) return { matchedId, twin: null };
+      const twin = findApprovedTwin(g.rawDescription, approvedByPerson);
+      return { matchedId, twin: twin?.masterItemId === matchedId ? twin : null };
+    });
+
     // Master_Item is a Link field to Master_Catalog — only set it when the AI's
     // guess exactly matches a real catalog item; otherwise leave it unlinked so
     // the reviewer picks one by hand rather than silently storing a bad link.
     const created = await createRecords(
       LIVING_MATCHES_TABLE(),
-      guesses.map((g) => {
-        const matchedId = nameToId.get(g.aiGuess);
+      guesses.map((g, i) => {
+        const { matchedId, twin } = decisions[i];
         return {
           fields: {
             Raw_Description: g.rawDescription,
@@ -66,7 +89,8 @@ export async function POST(req: NextRequest) {
             AI_Guessed_Master_Item: g.aiGuess,
             Master_Item: matchedId ? [matchedId] : [],
             Confidence: g.confidence,
-            Status: "Pending",
+            Status: twin ? "Verified" : "Pending",
+            ...(twin ? { Auto_Approved: true, Auto_Approved_From: twin.rawDescription.slice(0, 500) } : {}),
           },
         };
       }),
@@ -81,7 +105,7 @@ export async function POST(req: NextRequest) {
       confidence: guesses[i].confidence,
     }));
 
-    return NextResponse.json({ created: result });
+    return NextResponse.json({ created: result, autoApproved: decisions.filter((d) => d.twin).length });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error("[pricing/ai-match]", message);

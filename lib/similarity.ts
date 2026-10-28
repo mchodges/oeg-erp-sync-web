@@ -7,7 +7,7 @@ const STOPWORDS = new Set([
   "installation", "of", "on", "or", "per", "place", "price", "required", "shall", "the", "to", "with",
 ]);
 
-function tokens(text: string): string[] {
+export function tokens(text: string): string[] {
   const words = normalizeDescription(text)
     .toLowerCase()
     .split(/[^a-z0-9]+/)

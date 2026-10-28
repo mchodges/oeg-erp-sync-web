@@ -39,6 +39,7 @@ export function IngestPanel() {
   const [matchProgress, setMatchProgress] = useState({ current: 0, total: 0 });
   const [reviewRecords, setReviewRecords] = useState<LivingMatchRecord[]>([]);
   const [masterItems, setMasterItems] = useState<MasterCatalogOption[]>([]);
+  const [autoApproved, setAutoApproved] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const reset = useCallback(() => {
@@ -125,6 +126,7 @@ export function IngestPanel() {
   const scanAndMatch = useCallback(async () => {
     setAppState("scanning");
     setError("");
+    setAutoApproved(0);
     try {
       const res = await fetch("/api/pricing/unmatched");
       const data = await res.json();
@@ -140,6 +142,7 @@ export function IngestPanel() {
       setAppState("matching");
       setMatchProgress({ current: 0, total: batches.length });
 
+      let autoTotal = 0;
       for (let i = 0; i < batches.length; i++) {
         const res = await fetch("/api/pricing/ai-match", {
           method: "POST",
@@ -148,6 +151,8 @@ export function IngestPanel() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? `Server error ${res.status}`);
+        autoTotal += data.autoApproved ?? 0;
+        setAutoApproved(autoTotal);
         setMatchProgress({ current: i + 1, total: batches.length });
       }
 
@@ -241,6 +246,9 @@ export function IngestPanel() {
           <p className="text-gray-600 font-medium">
             Matching new items with AI — batch {matchProgress.current} of {matchProgress.total}
           </p>
+          {autoApproved > 0 && (
+            <p className="text-sm text-gray-400">{autoApproved} approved automatically so far</p>
+          )}
         </Card>
       )}
 
@@ -378,6 +386,14 @@ export function IngestPanel() {
 
       {appState === "review" && (
         <>
+          {autoApproved > 0 && (
+            <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-800">
+              <strong>{autoApproved.toLocaleString()}</strong> new line{autoApproved === 1 ? " was" : "s were"} approved
+              automatically because the wording is nearly identical to one you already approved and the AI was
+              highly confident. They are not in the list below. To check or undo them, filter Living_Matches in
+              Airtable by Auto_Approved.
+            </div>
+          )}
           <ReviewTable
             records={reviewRecords}
             masterItems={masterItems}

@@ -59,6 +59,8 @@ export interface LivingMatchAirtableRecord {
   masterItemId: string;
   confidence: string;
   status: string;
+  /** Approved by the tool (near-identical to a person-approved line), not by a person. */
+  autoApproved: boolean;
 }
 
 function toLivingMatch(r: AirtableRecord): LivingMatchAirtableRecord {
@@ -70,6 +72,7 @@ function toLivingMatch(r: AirtableRecord): LivingMatchAirtableRecord {
     masterItemId: normalizeLinkedIds(r.fields.Master_Item)[0] ?? "",
     confidence: String(r.fields.Confidence ?? "").trim(),
     status: String(r.fields.Status ?? "").trim(),
+    autoApproved: Boolean(r.fields.Auto_Approved),
   };
 }
 
