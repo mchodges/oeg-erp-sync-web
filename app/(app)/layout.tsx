@@ -11,7 +11,7 @@ export default function AppLayout({
         <h1 className="text-lg font-semibold text-white tracking-tight">
           OEG Sync Tools
         </h1>
-        <p className="text-indigo-300 text-xs mt-0.5">DPP Projects Airtable</p>
+        <p className="text-indigo-300 text-xs mt-0.5">ERP syncs, bid pricing and process workflows</p>
       </header>
       <Nav />
       {children}

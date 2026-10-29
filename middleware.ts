@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Password gate for the Bid Pricing Estimator (page + API routes).
+ * Password gate for the Bid Pricing Estimator (page + API routes) and the hidden /dev page.
  *
  * Browser-native HTTP Basic Auth: the browser asks for a username and password once
  * and then sends them with every page load and fetch() call, so no UI changes are needed.
@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
  * Deliberately NOT covered: /workflows (embedded in SharePoint) and the other tools.
  */
 export const config = {
-  matcher: ["/pricing/:path*", "/api/pricing/:path*"],
+  matcher: ["/pricing/:path*", "/api/pricing/:path*", "/dev/:path*"],
 };
 
 function safeEqual(a: string, b: string): boolean {

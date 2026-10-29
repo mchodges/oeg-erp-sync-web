@@ -22,11 +22,15 @@ export function Nav() {
     );
   };
 
+  const divider = <span aria-hidden className="self-center mx-2 h-5 w-px bg-indigo-600" />;
+
   return (
     <nav className="bg-indigo-800 px-4 flex gap-1">
       {link("/", "Hours Sync")}
       {link("/budget", "Budget Sync")}
+      {divider}
       {link("/pricing", "Bid Pricing")}
+      {divider}
       {link("/workflows", "Workflows")}
     </nav>
   );

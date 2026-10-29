@@ -32,6 +32,11 @@ export default function PricingPage() {
           {tab("trends", "Trends")}
         </div>
 
+        <p className="text-xs text-gray-500">
+          <span className="font-medium text-gray-700">Order of work:</span> 1. Ingest new bid tabs and review the AI
+          matches &rarr; 2. Estimate prices and write them to the Master Catalog. Trends charts price movement over time.
+        </p>
+
         {mode === "ingest" ? (
           <IngestPanel />
         ) : mode === "trends" ? (

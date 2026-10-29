@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "OEG Sync Tools",
-  description: "ERP sync automations for DPP Projects Airtable base",
+  description: "Internal OEG tools: ERP syncs, bid pricing and process workflows",
 };
 
 export default function RootLayout({
