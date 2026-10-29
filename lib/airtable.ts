@@ -135,6 +135,28 @@ export async function updateRecords(
   return results;
 }
 
+/**
+ * Creates or updates records, 10 at a time, matching existing rows on `mergeOn` fields (which
+ * must hold unique values). Running it again with the same keys updates rather than duplicates.
+ */
+export async function upsertRecords(
+  tableId: string,
+  records: { fields: Record<string, unknown> }[],
+  mergeOn: string[],
+  baseId: string = BASE_ID,
+): Promise<number> {
+  let count = 0;
+  for (let i = 0; i < records.length; i += BATCH_SIZE) {
+    const chunk = records.slice(i, i + BATCH_SIZE);
+    const data = (await atFetch("PATCH", `/${baseId}/${tableId}`, {
+      performUpsert: { fieldsToMergeOn: mergeOn },
+      records: chunk,
+    })) as { records: AirtableRecord[] };
+    count += data.records.length;
+  }
+  return count;
+}
+
 /** Normalize a linked-record field value to a flat list of record ID strings. */
 export function normalizeLinkedIds(field: unknown): string[] {
   if (!field || !Array.isArray(field)) return [];

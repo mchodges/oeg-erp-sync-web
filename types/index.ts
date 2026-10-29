@@ -1,3 +1,5 @@
+import type { PriceConfidence } from "@/lib/recommendedPrice";
+
 export type ActionType =
   | "CREATE"
   | "UPDATE"
@@ -163,6 +165,38 @@ export interface MasterCatalogStat {
   combinedCount: number;
   /** Bids thrown out of this item's pricing because their price is far from the item's other bids. */
   outliersRemoved: number;
+  /** Recency-weighted median of the item's bids (see lib/recommendedPrice.ts); null with no bids or for allowance items. */
+  recommendedPrice: number | null;
+  /** Low and high ends of the middle half of bids. */
+  priceP25: number | null;
+  priceP75: number | null;
+  priceConfidence: PriceConfidence;
+  /** Plain-English basis, e.g. "41 bids from 14 projects, latest Oct 2026". */
+  priceBasis: string;
+  /** Date (YYYY-MM-DD) of the newest bid behind the recommended price. */
+  latestBidDate: string | null;
+  /** Master_Catalog.Core: gets a monthly Price_History row. */
+  core: boolean;
+  /** Master_Catalog.Manual_Override: a price typed by hand; shown for reference only. */
+  manualOverride: number | null;
+}
+
+/** One core item in one month, written to the Price_History table. */
+export interface PriceHistoryRow {
+  /** Master_Catalog record id + month (YYYY-MM), unique, so each run updates rather than duplicates. */
+  key: string;
+  recordId: string;
+  masterItem: string;
+  /** First day of the month, YYYY-MM-01. */
+  month: string;
+  bids: number;
+  projects: number;
+  median: number | null;
+  p25: number | null;
+  p75: number | null;
+  /** The recommended price as it stood at the end of that month, using only bids up to then. */
+  recommended: number | null;
+  confidence: PriceConfidence;
 }
 
 /** One bid thrown out of an item's pricing for being far from the item's typical price. */
@@ -193,10 +227,16 @@ export interface PricingEstimateResult {
   unitMismatches: UnitMismatch[];
   outlierCount: number;
   outliers: OutlierBid[];
+  /** Monthly rows for the core items, written to Price_History by "Write to Airtable". */
+  history: PriceHistoryRow[];
   today: string;
 }
 
 export interface EstimateSyncResult {
   updated: number;
+  /** Price_History rows created or updated. */
+  historyRows: number;
+  /** Set when the catalog was updated but the Price_History write failed. */
+  historyError?: string;
   today: string;
 }

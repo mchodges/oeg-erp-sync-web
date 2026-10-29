@@ -22,12 +22,27 @@ export interface MasterCatalogRecord {
   combinesInto: string;
   /** What belongs in this item and what does not, written for the AI matcher (Master_Catalog.Match_Notes). */
   matchNotes: string;
+  /** Core items get a monthly row in Price_History (Master_Catalog.Core checkbox). */
+  core: boolean;
+  /** A price typed by hand in Master_Catalog.Manual_Override, or null. Never written by the app. */
+  manualOverride: number | null;
 }
 
 export async function fetchMasterCatalog(): Promise<MasterCatalogRecord[]> {
   const records = await fetchAllRecords(
     MASTER_CATALOG_TABLE(),
-    { fields: ["Master_Item_Name", "Standard_Unit", "Category", "Exclude_From_Stats", "Combines_Into", "Match_Notes"] },
+    {
+      fields: [
+        "Master_Item_Name",
+        "Standard_Unit",
+        "Category",
+        "Exclude_From_Stats",
+        "Combines_Into",
+        "Match_Notes",
+        "Core",
+        "Manual_Override",
+      ],
+    },
     PRICING_BASE_ID(),
   );
   return records.map((r) => ({
@@ -38,8 +53,13 @@ export async function fetchMasterCatalog(): Promise<MasterCatalogRecord[]> {
     excludeFromStats: Boolean(r.fields.Exclude_From_Stats),
     combinesInto: normalizeLinkedIds(r.fields.Combines_Into)[0] ?? "",
     matchNotes: String(r.fields.Match_Notes ?? "").trim(),
+    core: Boolean(r.fields.Core),
+    manualOverride: typeof r.fields.Manual_Override === "number" ? r.fields.Manual_Override : null,
   }));
 }
+
+/** The Price_History table: one row per core item per month, written by the Estimate's Write button. */
+export const PRICE_HISTORY_TABLE = () => process.env.PRICE_HISTORY_TABLE_ID ?? "tblx4Q1ke9zX1Hbqv";
 
 /** The Matching_Rules table: general instructions for the AI matcher, edited in Airtable without a deploy. */
 const MATCHING_RULES_TABLE = () => process.env.MATCHING_RULES_TABLE_ID ?? "tblj0iUlOtRYMuGVV";

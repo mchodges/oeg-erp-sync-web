@@ -11,6 +11,7 @@ type SortKey =
   | "category"
   | "standardUnit"
   | "count"
+  | "recommendedPrice"
   | "weightedAvg"
   | "median"
   | "low"
@@ -44,12 +45,38 @@ function fmtMoney(n: number | null): string {
 }
 
 function toCsv(report: MasterCatalogStat[]): string {
-  const header = ["Master Item", "Category", "Standard Unit", "Count", "Weighted Avg", "Median", "Low", "High", "Notes"];
+  const header = [
+    "Master Item",
+    "Category",
+    "Standard Unit",
+    "Count",
+    "Recommended Price",
+    "25th Percentile",
+    "75th Percentile",
+    "Confidence",
+    "Basis",
+    "Latest Bid",
+    "Core",
+    "Manual Override",
+    "Weighted Avg",
+    "Median",
+    "Low",
+    "High",
+    "Notes",
+  ];
   const rows = report.map((r) => [
     r.masterItem,
     r.category,
     r.standardUnit,
     String(r.count),
+    r.recommendedPrice ?? "",
+    r.priceP25 ?? "",
+    r.priceP75 ?? "",
+    r.priceConfidence,
+    r.priceBasis,
+    r.latestBidDate ?? "",
+    r.core ? "Yes" : "",
+    r.manualOverride ?? "",
     r.weightedAvg ?? "",
     r.median ?? "",
     r.low ?? "",
@@ -94,6 +121,12 @@ function downloadCsv(report: MasterCatalogStat[]) {
 function downloadOutliersCsv(outliers: OutlierBid[]) {
   downloadText(outliersToCsv(outliers), `Pricing_Outliers_${new Date().toISOString().split("T")[0]}.csv`);
 }
+
+const CONFIDENCE_CLASS: Record<MasterCatalogStat["priceConfidence"], string> = {
+  Solid: "bg-green-100 text-green-800",
+  Thin: "bg-amber-100 text-amber-700",
+  None: "bg-gray-100 text-gray-500",
+};
 
 function SortHeader({
   label,
@@ -189,8 +222,9 @@ export function EstimatePanel() {
           <div className="text-5xl mb-2">📈</div>
           <p className="text-gray-700 font-semibold text-lg">Generate a pricing report</p>
           <p className="text-gray-500 text-sm max-w-md">
-            Computes Weighted Average / Median / Low / High pricing per catalog item from
-            the full bid history, and can write it back to Airtable.
+            Works out a recommended price for every catalog item (recent bids count more),
+            with the middle half of bids and how solid the data is. Can write it back to
+            Airtable, plus a monthly price history for the core items.
           </p>
           <button
             onClick={generate}
@@ -266,7 +300,7 @@ export function EstimatePanel() {
             <div className="px-6 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-700">Pricing report</h2>
               <span className="text-sm text-gray-400">
-                {estimate.report.filter((r) => r.weightedAvg !== null).length} of {estimate.report.length} items priced
+                {estimate.report.filter((r) => r.recommendedPrice !== null).length} of {estimate.report.length} items priced
               </span>
             </div>
             <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
@@ -277,6 +311,9 @@ export function EstimatePanel() {
                     <SortHeader label="Category" sortKey="category" sort={sort} onSort={toggleSort} />
                     <SortHeader label="Unit" sortKey="standardUnit" sort={sort} onSort={toggleSort} />
                     <SortHeader label="Count" sortKey="count" sort={sort} onSort={toggleSort} align="right" />
+                    <SortHeader label="Recommended" sortKey="recommendedPrice" sort={sort} onSort={toggleSort} align="right" />
+                    <th className="px-4 py-3 font-medium text-right">Middle half</th>
+                    <th className="px-4 py-3 font-medium text-left">Confidence</th>
                     <SortHeader label="Weighted Avg" sortKey="weightedAvg" sort={sort} onSort={toggleSort} align="right" />
                     <SortHeader label="Median" sortKey="median" sort={sort} onSort={toggleSort} align="right" />
                     <SortHeader label="Low" sortKey="low" sort={sort} onSort={toggleSort} align="right" />
@@ -287,6 +324,11 @@ export function EstimatePanel() {
                   {sortedReport.map((r) => (
                     <tr key={r.recordId} className="hover:bg-gray-50 transition-colors">
                       <td className="px-5 py-3 text-gray-900">
+                        {r.core && (
+                          <span title="Core item: gets a monthly Price_History row" className="mr-1.5 text-amber-500">
+                            ★
+                          </span>
+                        )}
                         {r.masterItem}
                         {r.excludeFromStats && (
                           <span
@@ -312,11 +354,35 @@ export function EstimatePanel() {
                         )}
                       </td>
                       {r.excludeFromStats ? (
-                        <td colSpan={4} className="px-4 py-3 text-center text-xs text-amber-700">
+                        <td colSpan={7} className="px-4 py-3 text-center text-xs text-amber-700">
                           Not priced — excluded from stats
                         </td>
                       ) : (
                         <>
+                          <td className="px-4 py-3 text-right font-mono text-xs font-semibold text-gray-900">
+                            {fmtMoney(r.recommendedPrice)}
+                            {r.manualOverride != null && (
+                              <span
+                                className="block text-[10px] font-sans font-normal text-indigo-600"
+                                title="Typed by hand in Airtable (Manual_Override); used instead of the recommended price"
+                              >
+                                override {fmtMoney(r.manualOverride)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-xs text-gray-500 whitespace-nowrap">
+                            {r.priceP25 != null && r.priceP75 != null
+                              ? `${fmtMoney(r.priceP25)} – ${fmtMoney(r.priceP75)}`
+                              : "—"}
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            <span
+                              title={r.priceBasis}
+                              className={`inline-flex items-center rounded px-2 py-0.5 font-medium ${CONFIDENCE_CLASS[r.priceConfidence]}`}
+                            >
+                              {r.priceConfidence}
+                            </span>
+                          </td>
                           <td className="px-4 py-3 text-right font-mono text-xs text-gray-900">{fmtMoney(r.weightedAvg)}</td>
                           <td className="px-4 py-3 text-right font-mono text-xs text-gray-600">{fmtMoney(r.median)}</td>
                           <td className="px-4 py-3 text-right font-mono text-xs text-gray-600">{fmtMoney(r.low)}</td>
@@ -378,8 +444,17 @@ export function EstimatePanel() {
           </div>
           <div className="bg-gray-50 rounded-lg px-5 py-4 mb-8 inline-block">
             <div className="text-3xl font-bold text-green-700">{syncResult.updated}</div>
-            <div className="text-xs text-gray-500 mt-1">records updated</div>
+            <div className="text-xs text-gray-500 mt-1">catalog items updated</div>
           </div>
+          <div className="bg-gray-50 rounded-lg px-5 py-4 mb-8 ml-3 inline-block">
+            <div className="text-3xl font-bold text-green-700">{syncResult.historyRows}</div>
+            <div className="text-xs text-gray-500 mt-1">price history rows (core items)</div>
+          </div>
+          {syncResult.historyError && (
+            <p className="mb-6 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              The catalog was updated, but the price history could not be written: {syncResult.historyError}
+            </p>
+          )}
           <div>
             <button
               onClick={reset}

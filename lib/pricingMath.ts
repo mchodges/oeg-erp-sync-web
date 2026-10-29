@@ -1,9 +1,11 @@
-import type { MasterCatalogStat, OutlierBid, UnitMismatch } from "@/types";
+import type { MasterCatalogStat, OutlierBid, PriceHistoryRow, UnitMismatch } from "@/types";
 import type { BidHistoryRow } from "./supabase";
 import type { MasterCatalogRecord } from "./airtablePricing";
 import { combineSplitBids, type AcceptedLine } from "./combineBids";
 import { normalizeDescription } from "./normalizeText";
 import { normalizeUnit, unitsConflict } from "./units";
+import { parseBidDate } from "./priceTrend";
+import { monthlyHistory, recommend } from "./recommendedPrice";
 
 const REVIEW = "REVIEW";
 const OUTLIER_TRIM_PCT = 0.1;
@@ -33,6 +35,8 @@ interface Sample {
   qty: number;
   projectName: string;
   contractor: string;
+  /** Bid date (YYYY-MM-DD), or null when the bid tab had none. */
+  date: string | null;
 }
 
 /**
@@ -115,14 +119,20 @@ export interface EstimateReport {
   /** Bids thrown out because their price is far from the item's other bids (see screenOutliers). */
   outlierCount: number;
   outliers: OutlierBid[];
+  /** Monthly rows for the core catalog items (Master_Catalog.Core), for the Price_History table. */
+  history: PriceHistoryRow[];
 }
 
-/** Port of notebook Chunk 5: resolve → clean → dedupe → group → outlier-trim → stats → merge onto catalog. */
+/**
+ * Port of notebook Chunk 5: resolve → clean → dedupe → group → outlier screen → stats and recommended
+ * price → merge onto catalog. `asOf` (YYYY-MM-DD) is "today" for the recency weighting.
+ */
 export function computeEstimateReport(
   bidHistory: BidHistoryRow[],
   dictionaryMap: Map<string, string>,
   masterCatalog: MasterCatalogRecord[],
   ignoredDescriptions: Set<string>,
+  asOf: string,
 ): EstimateReport {
   let reviewCount = 0;
   let ignoredCount = 0;
@@ -179,8 +189,15 @@ export function computeEstimateReport(
     if (seenDupeKeys.has(dupeKey)) continue;
     seenDupeKeys.add(dupeKey);
 
+    const date = parseBidDate(row.bidDate);
     const group = groups.get(masterItem);
-    const pair = { price: row.price, qty: row.qty, projectName: row.projectName ?? "", contractor: row.contractor };
+    const pair = {
+      price: row.price,
+      qty: row.qty,
+      projectName: row.projectName ?? "",
+      contractor: row.contractor,
+      date,
+    };
     if (group) group.push(pair);
     else groups.set(masterItem, [pair]);
     accepted.push({
@@ -189,13 +206,20 @@ export function computeEstimateReport(
       itemId: masterItem,
       price: row.price,
       qty: row.qty,
+      date: date ?? undefined,
     });
   }
 
   // Split bids (excavate line + haul/place line) become one all-in sample for the all-in item.
   const combinedCounts = new Map<string, number>();
   for (const line of combineSplitBids(accepted, masterCatalog)) {
-    const pair = { price: line.price, qty: line.qty, projectName: line.projectName, contractor: line.contractor };
+    const pair = {
+      price: line.price,
+      qty: line.qty,
+      projectName: line.projectName,
+      contractor: line.contractor,
+      date: line.date ?? null,
+    };
     const group = groups.get(line.itemId);
     if (group) group.push(pair);
     else groups.set(line.itemId, [pair]);
@@ -203,6 +227,8 @@ export function computeEstimateReport(
   }
 
   const calcResults = new Map<string, StatRow>();
+  const recommendations = new Map<string, ReturnType<typeof recommend>>();
+  const history: PriceHistoryRow[] = [];
   const outliers: OutlierBid[] = [];
   const outlierCounts = new Map<string, number>();
   for (const [masterItem, samples] of groups) {
@@ -224,11 +250,33 @@ export function computeEstimateReport(
     }
     if (removed.length > 0) outlierCounts.set(masterItem, removed.length);
     calcResults.set(masterItem, computeStats(kept));
+    if (!item?.excludeFromStats) {
+      recommendations.set(masterItem, recommend(kept, asOf));
+      if (item?.core) {
+        for (const m of monthlyHistory(kept, asOf)) {
+          history.push({
+            key: `${masterItem}|${m.month.slice(0, 7)}`,
+            recordId: masterItem,
+            masterItem: item.masterItemName,
+            month: m.month,
+            bids: m.bids,
+            projects: m.projects,
+            median: m.median,
+            p25: m.p25,
+            p75: m.p75,
+            recommended: m.recommended,
+            confidence: m.confidence,
+          });
+        }
+      }
+    }
   }
+  history.sort((a, b) => a.masterItem.localeCompare(b.masterItem) || a.month.localeCompare(b.month));
   outliers.sort((a, b) => a.masterItem.localeCompare(b.masterItem) || a.price - b.price);
 
   const report: MasterCatalogStat[] = masterCatalog.map((item) => {
     const stats = calcResults.get(item.id);
+    const rec = recommendations.get(item.id) ?? recommend([], asOf);
     return {
       recordId: item.id,
       masterItem: item.masterItemName,
@@ -242,6 +290,14 @@ export function computeEstimateReport(
       excludeFromStats: item.excludeFromStats,
       combinedCount: combinedCounts.get(item.id) ?? 0,
       outliersRemoved: outlierCounts.get(item.id) ?? 0,
+      recommendedPrice: rec.price,
+      priceP25: rec.p25,
+      priceP75: rec.p75,
+      priceConfidence: rec.confidence,
+      priceBasis: item.excludeFromStats ? "Allowance item: not priced" : rec.basis,
+      latestBidDate: rec.latestBidDate,
+      core: item.core,
+      manualOverride: item.manualOverride,
     };
   });
 
@@ -254,5 +310,6 @@ export function computeEstimateReport(
     unitMismatches,
     outlierCount: outliers.length,
     outliers,
+    history,
   };
 }
