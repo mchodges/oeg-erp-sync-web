@@ -37,12 +37,14 @@ interface Sample {
 
 /**
  * A bid is thrown out when its price is far from the rest of the item's bids, judged on a ratio
- * scale (a $20 price for a $90 item is as far off as $450 is). "Far" is 3.5 robust spreads from the
- * median of the log-prices, and the spread never counts as smaller than 0.25, so a bid is never
- * thrown out unless it is more than about 2.4 times (or under 0.42 times) the item's typical price.
+ * scale (a $20 price for a $90 item is as far off as $450 is). "Far" is measured in robust spreads
+ * from the median of the log-prices, and the spread never counts as smaller than 0.25, so a bid is
+ * never thrown out unless it is under about 0.42 times or over about 3.5 times the item's typical price.
  */
 const SCREEN_MIN_SAMPLES = 8;
-const SCREEN_MAX_DEVIATIONS = 3.5;
+/** Stray low prices are usually placeholders ($0.01, $1), so they are screened closely; a high price is more often a real expensive job, so it gets more room. */
+const SCREEN_MAX_DEVIATIONS_LOW = 3.5;
+const SCREEN_MAX_DEVIATIONS_HIGH = 5;
 const SCREEN_MIN_SPREAD = 0.25;
 /** If this share or more of an item's bids would go, the item has two kinds of bid, not stray ones: keep them all. */
 const SCREEN_MAX_REMOVED_SHARE = 0.25;
@@ -63,7 +65,8 @@ function screenOutliers(samples: Sample[]): { kept: Sample[]; removed: Sample[];
   const kept: Sample[] = [];
   const removed: Sample[] = [];
   samples.forEach((s, i) => {
-    if (Math.abs(logs[i] - center) > SCREEN_MAX_DEVIATIONS * spread) removed.push(s);
+    const away = (logs[i] - center) / spread;
+    if (away < -SCREEN_MAX_DEVIATIONS_LOW || away > SCREEN_MAX_DEVIATIONS_HIGH) removed.push(s);
     else kept.push(s);
   });
   if (removed.length >= samples.length * SCREEN_MAX_REMOVED_SHARE) {
