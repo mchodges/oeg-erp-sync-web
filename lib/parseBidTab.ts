@@ -9,6 +9,12 @@ export interface BidTabParseResult {
 
 const HEADER_SCAN_WINDOW = 20;
 
+/** Header names for the bid-item number column. */
+const ID_HEADERS = new Set(["id", "item", "item no", "item no.", "item #", "no.", "#"]);
+
+/** The "A. " / "B) " that starts a lettered sub-item row. */
+const SUB_ITEM_MARKER = /^\(?[A-Za-z][.)]\s+/;
+
 /**
  * Repairs "UTF-8 decoded as Windows-1252" mojibake for curly quotes (frequently
  * used for inch/foot marks in bid tabs, e.g. a right-double-quote U+201D typed
@@ -121,17 +127,36 @@ export function parseBidTab(buffer: ArrayBuffer): BidTabParseResult {
     if (header[c]) contractors.push({ idx: c, name: header[c] });
   }
 
+  const idIdx = lowerHeader.findIndex((h) => ID_HEADERS.has(h));
+
   const rows: RawBidRow[] = [];
+  // Some engineers number a bid item on a heading row with no quantity ("4  RCP SEWER C-76, CL III...")
+  // and price its sizes on lettered rows beneath it ("A. 24" PIPE"). The heading is remembered so the
+  // lettered rows keep what they are a size OF.
+  let parentDesc = "";
 
   for (const row of rawRows.slice(headerIdx + 1)) {
-    const rawDesc = descriptionStr(row[descIdx]);
+    let rawDesc = descriptionStr(row[descIdx]);
     const rawQty = row[qtyIdx];
 
     if (!rawDesc || rawDesc.toUpperCase() === "DESCRIPTION") continue;
-    if (rawQty == null || rawQty === "") continue;
+
+    const hasId = idIdx !== -1 && cellStr(row[idIdx]) !== "";
+    if (rawQty == null || rawQty === "") {
+      parentDesc = hasId ? rawDesc.replace(/[\s:;-]+$/, "") : "";
+      continue;
+    }
 
     const qty = parseFloat(String(rawQty).replace(/,/g, ""));
     if (Number.isNaN(qty)) continue;
+
+    if (idIdx !== -1) {
+      if (hasId) {
+        parentDesc = "";
+      } else if (parentDesc && SUB_ITEM_MARKER.test(rawDesc)) {
+        rawDesc = `${parentDesc}: ${rawDesc.replace(SUB_ITEM_MARKER, "")}`;
+      }
+    }
 
     const unit = unitIdx !== -1 && row[unitIdx] != null ? cellStr(row[unitIdx]) : "EA";
 
