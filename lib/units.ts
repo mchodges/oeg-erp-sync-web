@@ -13,6 +13,17 @@ const ALIASES: Record<string, string> = {
   LUMPSUM: "LS",
   ACRE: "AC",
   ACRES: "AC",
+  CUBICYARD: "CY",
+  CUBICYARDS: "CY",
+  LINEARFOOT: "LF",
+  LINEARFEET: "LF",
+  SQUAREYARD: "SY",
+  SQUAREYARDS: "SY",
+  SQUAREFOOT: "SF",
+  DAYS: "DAY",
+  DY: "DAY",
+  VERTICALFEET: "VF",
+  VERTICALFOOT: "VF",
 };
 
 /** Units a new Master_Catalog item may use (the Standard_Unit choices; TONS is the legacy spelling of TON). */
