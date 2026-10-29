@@ -161,6 +161,20 @@ export interface MasterCatalogStat {
   excludeFromStats: boolean;
   /** How many of `count` are all-in samples built by adding a contractor's split lines (excavate + haul/place). */
   combinedCount: number;
+  /** Bids thrown out of this item's pricing because their price is far from the item's other bids. */
+  outliersRemoved: number;
+}
+
+/** One bid thrown out of an item's pricing for being far from the item's typical price. */
+export interface OutlierBid {
+  masterItem: string;
+  unit: string;
+  projectName: string;
+  contractor: string;
+  price: number;
+  qty: number;
+  /** Median price of the item's bids (before the throw-outs), for comparison. */
+  typicalPrice: number;
 }
 
 /** Bid rows left out of an item's pricing because their unit disagrees with the catalog unit. */
@@ -177,6 +191,8 @@ export interface PricingEstimateResult {
   ignoredCount: number;
   unitMismatchCount: number;
   unitMismatches: UnitMismatch[];
+  outlierCount: number;
+  outliers: OutlierBid[];
   today: string;
 }
 

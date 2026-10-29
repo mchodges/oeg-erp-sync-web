@@ -1,4 +1,4 @@
-import type { MasterCatalogStat, UnitMismatch } from "@/types";
+import type { MasterCatalogStat, OutlierBid, UnitMismatch } from "@/types";
 import type { BidHistoryRow } from "./supabase";
 import type { MasterCatalogRecord } from "./airtablePricing";
 import { combineSplitBids, type AcceptedLine } from "./combineBids";
@@ -26,6 +26,50 @@ interface StatRow {
   median: number;
   low: number;
   high: number;
+}
+
+interface Sample {
+  price: number;
+  qty: number;
+  projectName: string;
+  contractor: string;
+}
+
+/**
+ * A bid is thrown out when its price is far from the rest of the item's bids, judged on a ratio
+ * scale (a $20 price for a $90 item is as far off as $450 is). "Far" is 3.5 robust spreads from the
+ * median of the log-prices, and the spread never counts as smaller than 0.25, so a bid is never
+ * thrown out unless it is more than about 2.4 times (or under 0.42 times) the item's typical price.
+ */
+const SCREEN_MIN_SAMPLES = 8;
+const SCREEN_MAX_DEVIATIONS = 3.5;
+const SCREEN_MIN_SPREAD = 0.25;
+/** If this share or more of an item's bids would go, the item has two kinds of bid, not stray ones: keep them all. */
+const SCREEN_MAX_REMOVED_SHARE = 0.25;
+
+function medianOf(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+function screenOutliers(samples: Sample[]): { kept: Sample[]; removed: Sample[]; typicalPrice: number } {
+  const logs = samples.map((s) => Math.log(s.price));
+  const center = medianOf(logs);
+  const typicalPrice = Math.exp(center);
+  if (samples.length < SCREEN_MIN_SAMPLES) return { kept: samples, removed: [], typicalPrice };
+
+  const spread = Math.max(1.4826 * medianOf(logs.map((l) => Math.abs(l - center))), SCREEN_MIN_SPREAD);
+  const kept: Sample[] = [];
+  const removed: Sample[] = [];
+  samples.forEach((s, i) => {
+    if (Math.abs(logs[i] - center) > SCREEN_MAX_DEVIATIONS * spread) removed.push(s);
+    else kept.push(s);
+  });
+  if (removed.length >= samples.length * SCREEN_MAX_REMOVED_SHARE) {
+    return { kept: samples, removed: [], typicalPrice };
+  }
+  return { kept, removed, typicalPrice };
 }
 
 function computeStats(pairs: { price: number; qty: number }[]): StatRow {
@@ -65,6 +109,9 @@ export interface EstimateReport {
   /** Priced rows left out because the bid's unit differs from the catalog item's unit. */
   unitMismatchCount: number;
   unitMismatches: UnitMismatch[];
+  /** Bids thrown out because their price is far from the item's other bids (see screenOutliers). */
+  outlierCount: number;
+  outliers: OutlierBid[];
 }
 
 /** Port of notebook Chunk 5: resolve → clean → dedupe → group → outlier-trim → stats → merge onto catalog. */
@@ -80,7 +127,7 @@ export function computeEstimateReport(
   const catalogById = new Map(masterCatalog.map((c) => [c.id, c]));
   const mismatchGroups = new Map<string, UnitMismatch>();
   const seenDupeKeys = new Set<string>();
-  const groups = new Map<string, { price: number; qty: number }[]>();
+  const groups = new Map<string, Sample[]>();
   const accepted: AcceptedLine[] = [];
 
   // The dedupe below keeps the first line seen per project+contractor+item+price, so the
@@ -130,7 +177,7 @@ export function computeEstimateReport(
     seenDupeKeys.add(dupeKey);
 
     const group = groups.get(masterItem);
-    const pair = { price: row.price, qty: row.qty };
+    const pair = { price: row.price, qty: row.qty, projectName: row.projectName ?? "", contractor: row.contractor };
     if (group) group.push(pair);
     else groups.set(masterItem, [pair]);
     accepted.push({
@@ -145,7 +192,7 @@ export function computeEstimateReport(
   // Split bids (excavate line + haul/place line) become one all-in sample for the all-in item.
   const combinedCounts = new Map<string, number>();
   for (const line of combineSplitBids(accepted, masterCatalog)) {
-    const pair = { price: line.price, qty: line.qty };
+    const pair = { price: line.price, qty: line.qty, projectName: line.projectName, contractor: line.contractor };
     const group = groups.get(line.itemId);
     if (group) group.push(pair);
     else groups.set(line.itemId, [pair]);
@@ -153,9 +200,29 @@ export function computeEstimateReport(
   }
 
   const calcResults = new Map<string, StatRow>();
-  for (const [masterItem, pairs] of groups) {
-    calcResults.set(masterItem, computeStats(pairs));
+  const outliers: OutlierBid[] = [];
+  const outlierCounts = new Map<string, number>();
+  for (const [masterItem, samples] of groups) {
+    const item = catalogById.get(masterItem);
+    // Allowance items are not priced at all, so there is nothing to screen.
+    const { kept, removed, typicalPrice } = item?.excludeFromStats
+      ? { kept: samples, removed: [], typicalPrice: 0 }
+      : screenOutliers(samples);
+    for (const s of removed) {
+      outliers.push({
+        masterItem: item?.masterItemName ?? masterItem,
+        unit: item?.standardUnit ?? "",
+        projectName: s.projectName,
+        contractor: s.contractor,
+        price: round2(s.price),
+        qty: s.qty,
+        typicalPrice: round2(typicalPrice),
+      });
+    }
+    if (removed.length > 0) outlierCounts.set(masterItem, removed.length);
+    calcResults.set(masterItem, computeStats(kept));
   }
+  outliers.sort((a, b) => a.masterItem.localeCompare(b.masterItem) || a.price - b.price);
 
   const report: MasterCatalogStat[] = masterCatalog.map((item) => {
     const stats = calcResults.get(item.id);
@@ -171,9 +238,18 @@ export function computeEstimateReport(
       high: item.excludeFromStats ? null : stats?.high ?? null,
       excludeFromStats: item.excludeFromStats,
       combinedCount: combinedCounts.get(item.id) ?? 0,
+      outliersRemoved: outlierCounts.get(item.id) ?? 0,
     };
   });
 
   const unitMismatches = [...mismatchGroups.values()].sort((a, b) => b.rows - a.rows);
-  return { report, reviewCount, ignoredCount, unitMismatchCount, unitMismatches };
+  return {
+    report,
+    reviewCount,
+    ignoredCount,
+    unitMismatchCount,
+    unitMismatches,
+    outlierCount: outliers.length,
+    outliers,
+  };
 }

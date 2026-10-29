@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import type { EstimateSyncResult, MasterCatalogStat, PricingEstimateResult } from "@/types";
+import type { EstimateSyncResult, MasterCatalogStat, OutlierBid, PricingEstimateResult } from "@/types";
 import { Card, Spinner, ErrorCard } from "./ui";
 
 type AppState = "idle" | "generating" | "preview" | "writing" | "done" | "error";
@@ -57,6 +57,7 @@ function toCsv(report: MasterCatalogStat[]): string {
     [
       r.excludeFromStats ? "Allowance/contingency item — excluded from pricing stats" : "",
       r.combinedCount > 0 ? `${r.combinedCount} of ${r.count} samples combine a contractor's excavate and haul/place lines` : "",
+      r.outliersRemoved > 0 ? `${r.outliersRemoved} bid${r.outliersRemoved === 1 ? "" : "s"} thrown out as price outliers` : "",
     ]
       .filter(Boolean)
       .join("; "),
@@ -66,16 +67,32 @@ function toCsv(report: MasterCatalogStat[]): string {
     .join("\n");
 }
 
-function downloadCsv(report: MasterCatalogStat[]) {
+function outliersToCsv(outliers: OutlierBid[]): string {
+  const header = ["Master Item", "Unit", "Project", "Contractor", "Bid Price", "Qty", "Item's Typical Price (median)"];
+  const rows = outliers.map((o) => [o.masterItem, o.unit, o.projectName, o.contractor, o.price, o.qty, o.typicalPrice]);
+  return [header, ...rows]
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+}
+
+function downloadText(csv: string, filename: string) {
   // The leading BOM tells Excel the file is UTF-8; without it Excel on Windows reads it as
   // ANSI and garbles non-ASCII characters such as the em dash in the Notes column.
-  const blob = new Blob(["﻿" + toCsv(report)], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Pricing_Estimate_${new Date().toISOString().split("T")[0]}.csv`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function downloadCsv(report: MasterCatalogStat[]) {
+  downloadText(toCsv(report), `Pricing_Estimate_${new Date().toISOString().split("T")[0]}.csv`);
+}
+
+function downloadOutliersCsv(outliers: OutlierBid[]) {
+  downloadText(outliersToCsv(outliers), `Pricing_Outliers_${new Date().toISOString().split("T")[0]}.csv`);
 }
 
 function SortHeader({
@@ -228,6 +245,23 @@ export function EstimatePanel() {
             </details>
           )}
 
+          {estimate.outlierCount > 0 && (
+            <details className="px-5 py-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800">
+              <summary className="cursor-pointer">
+                {estimate.outlierCount.toLocaleString()} bids were thrown out of the prices because their
+                price is far from the other bids for the same item.
+              </summary>
+              <ul className="mt-2 space-y-0.5 text-xs">
+                {estimate.outliers.map((o, i) => (
+                  <li key={i}>
+                    {o.masterItem}: {fmtMoney(o.price)} per {o.unit} (typical {fmtMoney(o.typicalPrice)}) —{" "}
+                    {o.contractor}, {o.projectName || "unknown project"}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
           <Card className="overflow-hidden">
             <div className="px-6 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-700">Pricing report</h2>
@@ -311,6 +345,15 @@ export function EstimatePanel() {
             >
               Download CSV
             </button>
+            {estimate.outlierCount > 0 && (
+              <button
+                onClick={() => downloadOutliersCsv(estimate.outliers)}
+                className="px-5 py-2.5 text-gray-600 text-sm font-medium rounded-lg
+                  border border-gray-300 hover:bg-gray-50 transition-colors"
+              >
+                Download thrown-out bids
+              </button>
+            )}
             <button
               onClick={reset}
               className="px-5 py-2.5 text-gray-600 text-sm font-medium rounded-lg

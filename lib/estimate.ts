@@ -16,13 +16,9 @@ export async function generateEstimate(): Promise<PricingEstimateResult> {
     fetchIgnoredRawDescriptions(),
   ]);
 
-  const { report, reviewCount, ignoredCount, unitMismatchCount, unitMismatches } = computeEstimateReport(
-    bidHistory,
-    dictionaryMap,
-    masterCatalog,
-    ignoredDescriptions,
-  );
+  const { report, reviewCount, ignoredCount, unitMismatchCount, unitMismatches, outlierCount, outliers } =
+    computeEstimateReport(bidHistory, dictionaryMap, masterCatalog, ignoredDescriptions);
   const today = new Date().toISOString().split("T")[0];
 
-  return { report, reviewCount, ignoredCount, unitMismatchCount, unitMismatches, today };
+  return { report, reviewCount, ignoredCount, unitMismatchCount, unitMismatches, outlierCount, outliers, today };
 }
