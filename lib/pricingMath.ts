@@ -5,7 +5,7 @@ import { combineSplitBids, type AcceptedLine } from "./combineBids";
 import { normalizeDescription } from "./normalizeText";
 import { normalizeUnit, unitsConflict } from "./units";
 import { parseBidDate } from "./priceTrend";
-import { monthlyHistory, recommend } from "./recommendedPrice";
+import { monthlyHistory, recentWindow, recommend } from "./recommendedPrice";
 
 const REVIEW = "REVIEW";
 const OUTLIER_TRIM_PCT = 0.1;
@@ -52,6 +52,13 @@ const SCREEN_MAX_DEVIATIONS_HIGH = 5;
 const SCREEN_MIN_SPREAD = 0.25;
 /** If this share or more of an item's bids would go, the item has two kinds of bid, not stray ones: keep them all. */
 const SCREEN_MAX_REMOVED_SHARE = 0.25;
+/**
+ * A price under this fraction of the item's median is a token bid ($0.01 or $1 against a $1,500 item),
+ * never a real price, so it is always thrown out, even when many bidders do it (allowance items such as
+ * ductile iron fittings draw a lot of them). The median is taken over all bids, so this only works while
+ * token bids are fewer than half.
+ */
+const SCREEN_TOKEN_FRACTION = 0.02;
 
 function medianOf(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -65,18 +72,23 @@ function screenOutliers(samples: Sample[]): { kept: Sample[]; removed: Sample[];
   const typicalPrice = Math.exp(center);
   if (samples.length < SCREEN_MIN_SAMPLES) return { kept: samples, removed: [], typicalPrice };
 
-  const spread = Math.max(1.4826 * medianOf(logs.map((l) => Math.abs(l - center))), SCREEN_MIN_SPREAD);
+  // Token bids go first, so they cannot stretch the spread used to judge the rest.
+  const tokens = samples.filter((s) => s.price < typicalPrice * SCREEN_TOKEN_FRACTION);
+  const rest = samples.filter((s) => s.price >= typicalPrice * SCREEN_TOKEN_FRACTION);
+  const restLogs = rest.map((s) => Math.log(s.price));
+  const restCenter = medianOf(restLogs);
+  const spread = Math.max(1.4826 * medianOf(restLogs.map((l) => Math.abs(l - restCenter))), SCREEN_MIN_SPREAD);
   const kept: Sample[] = [];
   const removed: Sample[] = [];
-  samples.forEach((s, i) => {
-    const away = (logs[i] - center) / spread;
+  rest.forEach((s, i) => {
+    const away = (restLogs[i] - restCenter) / spread;
     if (away < -SCREEN_MAX_DEVIATIONS_LOW || away > SCREEN_MAX_DEVIATIONS_HIGH) removed.push(s);
     else kept.push(s);
   });
-  if (removed.length >= samples.length * SCREEN_MAX_REMOVED_SHARE) {
-    return { kept: samples, removed: [], typicalPrice };
+  if (removed.length >= rest.length * SCREEN_MAX_REMOVED_SHARE) {
+    return { kept: rest, removed: tokens, typicalPrice };
   }
-  return { kept, removed, typicalPrice };
+  return { kept, removed: [...tokens, ...removed], typicalPrice };
 }
 
 function computeStats(pairs: { price: number; qty: number }[]): StatRow {
@@ -228,6 +240,7 @@ export function computeEstimateReport(
 
   const calcResults = new Map<string, StatRow>();
   const recommendations = new Map<string, ReturnType<typeof recommend>>();
+  const statsWindows = new Map<string, string>();
   const history: PriceHistoryRow[] = [];
   const outliers: OutlierBid[] = [];
   const outlierCounts = new Map<string, number>();
@@ -249,7 +262,10 @@ export function computeEstimateReport(
       });
     }
     if (removed.length > 0) outlierCounts.set(masterItem, removed.length);
-    calcResults.set(masterItem, computeStats(kept));
+    // Count / average / median / low / high come from the recent window, not all history.
+    const recent = recentWindow(kept, asOf);
+    calcResults.set(masterItem, computeStats(recent.samples));
+    statsWindows.set(masterItem, recent.label);
     if (!item?.excludeFromStats) {
       recommendations.set(masterItem, recommend(kept, asOf));
       if (item?.core) {
@@ -294,7 +310,12 @@ export function computeEstimateReport(
       priceP25: rec.p25,
       priceP75: rec.p75,
       priceConfidence: rec.confidence,
-      priceBasis: item.excludeFromStats ? "Allowance item: not priced" : rec.basis,
+      statsWindow: statsWindows.get(item.id) ?? "",
+      priceBasis: item.excludeFromStats
+        ? "Allowance item: not priced"
+        : statsWindows.has(item.id)
+          ? `${rec.basis}; table stats from ${statsWindows.get(item.id)}`
+          : rec.basis,
       latestBidDate: rec.latestBidDate,
       core: item.core,
       manualOverride: item.manualOverride,

@@ -56,6 +56,7 @@ function toCsv(report: MasterCatalogStat[]): string {
     "Confidence",
     "Basis",
     "Latest Bid",
+    "Stats Window",
     "Core",
     "Manual Override",
     "Weighted Avg",
@@ -75,6 +76,7 @@ function toCsv(report: MasterCatalogStat[]): string {
     r.priceConfidence,
     r.priceBasis,
     r.latestBidDate ?? "",
+    r.statsWindow,
     r.core ? "Yes" : "",
     r.manualOverride ?? "",
     r.weightedAvg ?? "",
@@ -344,6 +346,14 @@ export function EstimatePanel() {
                       <td className="px-4 py-3 text-xs text-gray-500">{r.standardUnit}</td>
                       <td className="px-4 py-3 text-right font-mono text-xs text-gray-600">
                         {r.count}
+                        {r.statsWindow && (
+                          <span
+                            className="block text-[10px] font-sans text-gray-400"
+                            title="Count, average, median, low and high use only these bids: the last 12 months, widened to 24 months or all history when there are too few"
+                          >
+                            {r.statsWindow}
+                          </span>
+                        )}
                         {r.combinedCount > 0 && (
                           <span
                             className="block text-[10px] font-sans text-gray-400"

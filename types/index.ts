@@ -171,8 +171,10 @@ export interface MasterCatalogStat {
   priceP25: number | null;
   priceP75: number | null;
   priceConfidence: PriceConfidence;
-  /** Plain-English basis, e.g. "41 bids from 14 projects, latest Oct 2026". */
+  /** Plain-English basis, e.g. "41 bids from 14 projects, latest Oct 2026; table stats from last 12 months". */
   priceBasis: string;
+  /** Which bids the count / average / median / low / high use: "last 12 months", "last 24 months" or "all history" ("" with no bids). */
+  statsWindow: string;
   /** Date (YYYY-MM-DD) of the newest bid behind the recommended price. */
   latestBidDate: string | null;
   /** Master_Catalog.Core: gets a monthly Price_History row. */
