@@ -4,8 +4,9 @@ import { useState } from "react";
 import { IngestPanel } from "./IngestPanel";
 import { EstimatePanel } from "./EstimatePanel";
 import { TrendsPanel } from "./TrendsPanel";
+import { AboutPanel } from "./AboutPanel";
 
-type Mode = "ingest" | "estimate" | "trends";
+type Mode = "ingest" | "estimate" | "trends" | "about";
 
 export default function PricingPage() {
   const [mode, setMode] = useState<Mode>("ingest");
@@ -30,6 +31,7 @@ export default function PricingPage() {
           {tab("ingest", "Ingest")}
           {tab("estimate", "Estimate")}
           {tab("trends", "Trends")}
+          {tab("about", "About")}
         </div>
 
         <p className="text-xs text-gray-500">
@@ -42,6 +44,10 @@ export default function PricingPage() {
         ) : mode === "trends" ? (
           <div className="max-w-6xl">
             <TrendsPanel />
+          </div>
+        ) : mode === "about" ? (
+          <div className="max-w-3xl">
+            <AboutPanel />
           </div>
         ) : (
           <div className="max-w-5xl">
